@@ -7,7 +7,7 @@
     "scripts": {
         "dev:elder": "npm run dev --workspace=@elder-nest/elder-app",
         "dev:family": "npm run dev --workspace=@elder-nest/family-dashboard",
-        "dev": "concurrently \"npm run dev:elder\" \"npm run dev:family\"",
+        "dev": "npm run dev:family",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {

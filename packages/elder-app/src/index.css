@@ -4,40 +4,46 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%; /* Off-white for Elder */
-    --foreground: 222.2 84% 4.9%;
+    /* Base Colors - Soothing & Warm */
+    --background: 210 20% 98%;
+    --foreground: 224 71% 4%;
 
+    /* Card/Surface - Clear & Readable */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 71% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 71% 4%;
 
-    --primary: 212 72% 59%; /* Soft Blue */
+    /* Primary - Trustworthy Blue */
+    --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 88 50% 48%; /* Warm Green */
+    /* Secondary - Calming Teal/Green */
+    --secondary: 162 47% 50%;
     --secondary-foreground: 210 40% 98%;
 
+    /* Muted */
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 36 100% 57%; /* Gentle Orange */
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Warm Orange for attention */
+    --accent: 32 95% 60%;
+    --accent-foreground: 210 40% 98%;
 
+    /* Destructive/Emergency */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 1rem; /* Larger radius */
+    --ring: 221 83% 53%;
+    --radius: 1.5rem; /* Friendly, rounded corners */
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    /* Dark mode values if needed */
+  /* Custom Utilities for Glassmorphism */
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-lg border border-white/50 shadow-xl;
   }
 }
 
@@ -46,6 +52,21 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-50 via-white to-orange-50 min-h-screen selection:bg-primary/20;
   }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 3s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
 }
