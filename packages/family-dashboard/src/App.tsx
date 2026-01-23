@@ -42,9 +42,7 @@ function App() {
           {/* Elder Portal */}
           <Route path="/elder" element={
             <ProtectedRoute allowedRoles={['elder']}>
-              <div className="min-h-screen bg-[#F8F9FA] text-[#2C3E50] font-sans">
-                <ElderHomePage />
-              </div>
+              <ElderHomePage />
             </ProtectedRoute>
           } />
           <Route path="/elder/welcome" element={

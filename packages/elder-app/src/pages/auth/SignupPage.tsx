@@ -11,7 +11,7 @@ import {
     GradientButton,
     signUpElder,
     elderSignupSchema,
-    ElderSignupFormData,
+    type ElderSignupFormData,
     getFriendlyErrorMessage
 } from '@elder-nest/shared';
 
@@ -31,7 +31,7 @@ const SignupPage = () => {
     const nextStep = async () => {
         let fieldsToValidate: (keyof ElderSignupFormData)[] = [];
         if (step === 1) fieldsToValidate = ['fullName', 'email', 'password', 'confirmPassword'];
-        if (step === 2) fieldsToValidate = ['age', 'emergencyContact'];
+        if (step === 2) fieldsToValidate = ['dateOfBirth', 'emergencyContact'];
 
         // Trigger validation for current step
         const isValid = await trigger(fieldsToValidate);
@@ -81,7 +81,7 @@ const SignupPage = () => {
 
                 <div className="text-center mb-6">
                     <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-teal-600 mb-2">
-                        Create Account
+                        Create Your Account
                     </h2>
                     <p className="text-gray-500 font-medium">Step {step} of 3</p>
                 </div>
@@ -145,12 +145,12 @@ const SignupPage = () => {
                                     We need a few details to customize your experience.
                                 </div>
                                 <FormInput
-                                    label="Age"
-                                    type="number"
+                                    label="Date of Birth"
+                                    type="date"
                                     icon={Calendar}
                                     sizeVariant="elder"
-                                    {...register('age', { valueAsNumber: true })}
-                                    error={errors.age?.message?.toString()} // coercion type issue workaround if needed
+                                    {...register('dateOfBirth')}
+                                    error={errors.dateOfBirth?.message?.toString()}
                                 />
                                 <FormInput
                                     label="Emergency Contact (Phone)"
@@ -159,7 +159,7 @@ const SignupPage = () => {
                                     sizeVariant="elder"
                                     {...register('emergencyContact')}
                                     error={errors.emergencyContact?.message}
-                                    placeholder="e.g. 555-123-4567"
+                                    placeholder="e.g. +1 234 567 8900"
                                 />
                             </motion.div>
                         )}

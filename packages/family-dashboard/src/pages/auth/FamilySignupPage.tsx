@@ -33,7 +33,7 @@ const SignupPage = () => {
     const nextStep = async () => {
         let fields: (keyof FamilySignupFormData)[] = [];
         if (step === 1) fields = ['email', 'password', 'confirmPassword'];
-        if (step === 2) fields = ['fullName', 'phone', 'relationship'];
+        if (step === 2) fields = ['fullName', 'countryCode', 'phone', 'relationship'];
 
         const isValid = await trigger(fields);
         if (isValid) setStep(step + 1);
@@ -116,7 +116,55 @@ const SignupPage = () => {
                                         className="space-y-4"
                                     >
                                         <FormInput label="Full Name" icon={User} sizeVariant="family" {...register('fullName')} error={errors.fullName?.message} />
-                                        <FormInput label="Phone Number" type="tel" icon={Phone} sizeVariant="family" {...register('phone')} error={errors.phone?.message} />
+
+                                        {/* Phone Number with Country Code */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    {...register('countryCode')}
+                                                    className="w-32 h-14 px-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-sm"
+                                                >
+                                                    <option value="">Code</option>
+                                                    <option value="+1">🇺🇸 +1</option>
+                                                    <option value="+44">🇬🇧 +44</option>
+                                                    <option value="+91">🇮🇳 +91</option>
+                                                    <option value="+86">🇨🇳 +86</option>
+                                                    <option value="+81">🇯🇵 +81</option>
+                                                    <option value="+49">🇩🇪 +49</option>
+                                                    <option value="+33">🇫🇷 +33</option>
+                                                    <option value="+61">🇦🇺 +61</option>
+                                                    <option value="+55">🇧🇷 +55</option>
+                                                    <option value="+52">🇲🇽 +52</option>
+                                                    <option value="+7">🇷🇺 +7</option>
+                                                    <option value="+82">🇰🇷 +82</option>
+                                                    <option value="+39">🇮🇹 +39</option>
+                                                    <option value="+34">🇪🇸 +34</option>
+                                                    <option value="+31">🇳🇱 +31</option>
+                                                    <option value="+46">🇸🇪 +46</option>
+                                                    <option value="+47">🇳🇴 +47</option>
+                                                    <option value="+41">🇨🇭 +41</option>
+                                                    <option value="+971">🇦🇪 +971</option>
+                                                    <option value="+966">🇸🇦 +966</option>
+                                                    <option value="+65">🇸🇬 +65</option>
+                                                    <option value="+60">🇲🇾 +60</option>
+                                                    <option value="+63">🇵🇭 +63</option>
+                                                    <option value="+62">🇮🇩 +62</option>
+                                                    <option value="+84">🇻🇳 +84</option>
+                                                    <option value="+27">🇿🇦 +27</option>
+                                                    <option value="+234">🇳🇬 +234</option>
+                                                    <option value="+20">🇪🇬 +20</option>
+                                                </select>
+                                                <input
+                                                    type="tel"
+                                                    {...register('phone')}
+                                                    placeholder="Phone number"
+                                                    className="flex-1 h-14 px-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:border-indigo-500 transition-all"
+                                                />
+                                            </div>
+                                            {errors.countryCode && <p className="text-red-500 text-sm">{errors.countryCode.message}</p>}
+                                            {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
+                                        </div>
 
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Relationship to Elder</label>

@@ -21,7 +21,14 @@ const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
     ({ label, icon: Icon, error, sizeVariant = 'elder', className, type = 'text', containerClassName, ...props }, ref) => {
         const [showPassword, setShowPassword] = useState(false);
         const [isFocused, setIsFocused] = useState(false);
-        const [hasValue, setHasValue] = useState(false);
+        const [internalValue, setInternalValue] = useState('');
+        const inputRef = React.useRef<HTMLInputElement>(null);
+
+        // Merge refs
+        React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+
+        // Check if input has value (handles both controlled and uncontrolled scenarios)
+        const hasValue = Boolean(props.value) || Boolean(props.defaultValue) || internalValue.length > 0;
 
         // Determine input type based on toggle
         const inputType = type === 'password' ? (showPassword ? 'text' : 'password') : type;
@@ -30,10 +37,8 @@ const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         const heightClass = sizeVariant === 'elder' ? 'h-16 text-lg' : 'h-14 text-base';
         const iconSize = sizeVariant === 'elder' ? 24 : 20;
 
-
         const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             setIsFocused(false);
-            setHasValue(e.target.value.length > 0);
             props.onBlur?.(e);
         };
 
@@ -43,9 +48,9 @@ const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         };
 
         const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            setHasValue(e.target.value.length > 0);
+            setInternalValue(e.target.value);
             props.onChange?.(e);
-        }
+        };
 
         return (
             <div className={cn("relative w-full mb-6", containerClassName)}>
@@ -59,7 +64,7 @@ const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
 
                     {/* The Input */}
                     <input
-                        ref={ref}
+                        ref={inputRef}
                         type={inputType}
                         className={cn(
                             "w-full bg-white border-2 rounded-xl outline-none transition-all duration-300 placeholder-transparent",
@@ -85,7 +90,7 @@ const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
                         className={cn(
                             "absolute left-4 transition-all duration-200 pointer-events-none text-gray-400",
                             Icon ? "left-12" : "left-4",
-                            (isFocused || hasValue || props.value)
+                            (isFocused || hasValue)
                                 ? "-top-3 bg-white px-2 text-sm font-medium text-indigo-600"
                                 : "top-1/2 -translate-y-1/2"
                         )}
