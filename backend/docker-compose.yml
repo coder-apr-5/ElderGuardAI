@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Node.js Express API
+  node-api:
+    build:
+      context: ./node-api
+      dockerfile: Dockerfile
+    container_name: eldernest-api
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - PYTHON_ML_SERVICE_URL=http://python-ml:8000
+    env_file:
+      - ./node-api/.env
+    depends_on:
+      - python-ml
+    volumes:
+      - ./node-api/logs:/app/logs
+    networks:
+      - eldernest-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Python FastAPI ML Service
+  python-ml:
+    build:
+      context: ./python-ml
+      dockerfile: Dockerfile
+    container_name: eldernest-ml
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+    env_file:
+      - ./python-ml/.env
+    volumes:
+      - ./python-ml/trained_models:/app/trained_models
+    networks:
+      - eldernest-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  eldernest-network:
+    driver: bridge
+
+volumes:
+  node-api-logs:
+  ml-models:

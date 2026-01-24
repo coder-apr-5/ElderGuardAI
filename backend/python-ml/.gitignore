@@ -1,0 +1,58 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Python ML Service - Git Ignore
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# ━━━ Credentials & Secrets ━━━
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+credentials*.json
+*-credentials.json
+service-account*.json
+
+# ━━━ Python ━━━
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ━━━ Virtual Environment ━━━
+venv/
+ENV/
+env/
+.venv/
+
+# ━━━ ML Models (large files) ━━━
+*.pkl
+*.h5
+*.model
+*.weights
+*.onnx
+*.pb
+trained_models/*.pkl
+trained_models/*.h5
+
+# ━━━ IDE & Editor ━━━
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ━━━ OS Files ━━━
+.DS_Store
+Thumbs.db
+
+# ━━━ Testing ━━━
+.pytest_cache/
+htmlcov/
+.coverage
+
+# ━━━ Misc ━━━
+*.tmp
+*.temp
+.cache/

@@ -1,0 +1,55 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Node.js API - Git Ignore
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# ━━━ Credentials & Secrets ━━━
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.p12
+serviceAccount.json
+firebase-admin*.json
+google-credentials*.json
+credentials*.json
+*-credentials.json
+*-service-account.json
+
+# ━━━ Dependencies ━━━
+node_modules/
+
+# ━━━ Build Output ━━━
+dist/
+build/
+out/
+
+# ━━━ Logs ━━━
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ━━━ Testing ━━━
+coverage/
+.nyc_output/
+
+# ━━━ IDE & Editor ━━━
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ━━━ OS Files ━━━
+.DS_Store
+Thumbs.db
+
+# ━━━ Misc ━━━
+*.tmp
+*.temp
+.cache/

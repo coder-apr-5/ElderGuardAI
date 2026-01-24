@@ -1,0 +1,4 @@
+# Placeholder for trained models
+# This directory stores:
+# - risk_model.pkl: RandomForest classifier for risk prediction
+# - emotion_model.h5: CNN model for emotion detection (optional)

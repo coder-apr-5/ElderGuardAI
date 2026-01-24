@@ -1,0 +1,295 @@
+{
+	"info": {
+		"_postman_id": "eldernest-api-collection",
+		"name": "ElderNest AI API",
+		"description": "API collection for ElderNest elderly care platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api/v1"
+		},
+		{
+			"key": "mlUrl",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "authToken",
+			"value": "YOUR_FIREBASE_ID_TOKEN"
+		}
+	],
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "API Health Check",
+					"request": {
+						"method": "GET",
+						"url": "http://localhost:5000/health"
+					}
+				},
+				{
+					"name": "ML Service Health",
+					"request": {
+						"method": "GET",
+						"url": "{{mlUrl}}/health"
+					}
+				}
+			]
+		},
+		{
+			"name": "Chat",
+			"item": [
+				{
+					"name": "Send Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"Hello, how are you today?\"\n}"
+						},
+						"url": "{{baseUrl}}/chat/send"
+					}
+				},
+				{
+					"name": "Get Chat History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/chat/history?limit=50",
+							"host": ["{{baseUrl}}"],
+							"path": ["chat", "history"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Clear Chat History",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/chat/history"
+					}
+				}
+			]
+		},
+		{
+			"name": "Elder",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/elder/profile"
+					}
+				},
+				{
+					"name": "Log Mood",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"score\": 0.7,\n  \"label\": \"good\",\n  \"notes\": \"Feeling well today\"\n}"
+						},
+						"url": "{{baseUrl}}/elder/mood"
+					}
+				},
+				{
+					"name": "Get Medicines",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/elder/medicines"
+					}
+				},
+				{
+					"name": "Take Medicine",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/elder/medicine/MEDICINE_ID/take"
+					}
+				},
+				{
+					"name": "Trigger Emergency",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"sos\",\n  \"message\": \"Need help!\"\n}"
+						},
+						"url": "{{baseUrl}}/elder/emergency"
+					}
+				}
+			]
+		},
+		{
+			"name": "Family",
+			"item": [
+				{
+					"name": "Get Connected Elders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/family/elders"
+					}
+				},
+				{
+					"name": "Get Elder Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/family/elder/ELDER_ID/status"
+					}
+				},
+				{
+					"name": "Get Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": "{{baseUrl}}/family/notifications"
+					}
+				},
+				{
+					"name": "Connect to Elder",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"ABC123\",\n  \"relationship\": \"son\"\n}"
+						},
+						"url": "{{baseUrl}}/family/connect"
+					}
+				}
+			]
+		},
+		{
+			"name": "ML Service",
+			"item": [
+				{
+					"name": "Predict Risk",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"user123\",\n  \"features\": {\n    \"avgMoodScore\": 0.3,\n    \"medicineAdherence\": 0.5,\n    \"avgSentiment\": -0.4,\n    \"inactivityDays\": 5,\n    \"missedMedicines\": 3,\n    \"negativeChatCount\": 5\n  }\n}"
+						},
+						"url": "{{mlUrl}}/api/predict-risk"
+					}
+				},
+				{
+					"name": "Analyze Emotion",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"user123\",\n  \"image\": \"BASE64_IMAGE_DATA\"\n}"
+						},
+						"url": "{{mlUrl}}/api/analyze-emotion"
+					}
+				}
+			]
+		}
+	]
+}
