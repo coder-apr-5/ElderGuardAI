@@ -7,6 +7,8 @@ import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import ProfileSetupPage from "@/pages/auth/ProfileSetupPage";
 import { ProtectedRoute } from "@elder-nest/shared";
 
+import ChatPage from "@/pages/ChatPage";
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -18,6 +20,11 @@ function App() {
             <Route path="/" element={
               <ProtectedRoute allowedRoles={['elder']}>
                 <HomePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat" element={
+              <ProtectedRoute allowedRoles={['elder']}>
+                <ChatPage />
               </ProtectedRoute>
             } />
             <Route path="/auth/login" element={<LoginPage />} />

@@ -2,7 +2,7 @@
 // ElderNest Auth Service - Server Entry Point
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -33,7 +33,7 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -68,7 +68,7 @@ app.use((req, _res, next) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Health check
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     service: 'eldernest-auth',
@@ -84,7 +84,7 @@ app.use('/api/connections', connectionRoutes);
 app.use('/api', connectionRoutes);
 
 // 404 handler
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Endpoint not found',
@@ -95,11 +95,11 @@ app.use((_req, res) => {
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', { error: err.message, stack: err.stack });
-  
+
   res.status(500).json({
     success: false,
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
       : err.message,
     code: 'INTERNAL_ERROR',
   });
@@ -114,11 +114,11 @@ async function startServer() {
     // Initialize Firebase
     logger.info('Initializing Firebase...');
     initializeFirebase();
-    
+
     // Initialize Twilio
     logger.info('Initializing Twilio...');
     initializeTwilio();
-    
+
     // Start server
     app.listen(PORT, () => {
       logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -145,20 +145,20 @@ async function startServer() {
       logger.info('  GET  /api/countries                  - Get supported countries');
       logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     });
-    
+
     // Graceful shutdown
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received. Shutting down...');
       process.exit(0);
     });
-    
+
     process.on('SIGINT', () => {
       logger.info('SIGINT received. Shutting down...');
       process.exit(0);
     });
-    
+
   } catch (error) {
-    logger.error('Failed to start server', { error });
+    logger.error('Failed to start server', error instanceof Error ? { message: error.message, stack: error.stack } : { error });
     process.exit(1);
   }
 }

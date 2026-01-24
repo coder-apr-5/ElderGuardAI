@@ -21,19 +21,24 @@ export function initializeFirebase(): admin.app.App {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
-    if (!projectId || !privateKey || !clientEmail) {
-        logger.warn('Firebase credentials not fully configured. Using emulator or default settings.');
+    const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 
-        // For development without credentials
-        if (process.env.NODE_ENV === 'development') {
+    // Check if we are using mock credentials
+    if (!projectId || !privateKey || !clientEmail || privateKey.includes('MOCK') || isDev) {
+        if (!isDev) {
+            logger.warn('Missing or mock Firebase credentials in non-development environment');
+        } else {
+            logger.info(`Firebase initialized in development mode (Project: demo-eldernest)`);
+        }
+
+        if (admin.apps.length === 0) {
             firebaseApp = admin.initializeApp({
                 projectId: 'demo-eldernest',
             });
-            logger.info('Firebase initialized in development mode');
-            return firebaseApp;
+        } else {
+            firebaseApp = admin.app();
         }
-
-        throw new Error('Firebase credentials are required in production');
+        return firebaseApp;
     }
 
     try {

@@ -11,8 +11,9 @@ import { validatePhoneNumber, isPhoneRegistered, getUserByPhone } from './phone.
 import { validateEmailAddress, isEmailRegistered, getUserByEmail, normalize as normalizeEmail } from './email.service';
 import { createPendingConnection, verifyFamilyConnection, getPendingConnection } from './family-connection.service';
 import { logger, logAuthEvent, logSecurityEvent } from '../utils/logger';
-import type { User, UserRole, JWTPayload, FamilyRelation } from '../types';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import type { User, UserRole, JWTPayload, FamilyRelation, AuthResponse } from '../types';
+import admin from 'firebase-admin';
+const { Timestamp, FieldValue } = admin.firestore;
 
 const BCRYPT_ROUNDS = 12;
 

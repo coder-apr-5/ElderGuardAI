@@ -8,7 +8,8 @@ import { getDb, Collections } from '../config/firebase';
 import { sendSMS, formatOTPMessage } from '../config/twilio';
 import { logger, logSecurityEvent } from '../utils/logger';
 import type { OTPDocument, OTPSendResult, OTPVerifyResult, OTPPurpose, OTPMetadata } from '../types';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
+const { Timestamp, FieldValue } = admin.firestore;
 
 /**
  * Generate a cryptographically secure 6-digit OTP

@@ -2,7 +2,10 @@
 // OTP Type Definitions
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { Timestamp } from 'firebase-admin/firestore';
+import type { firestore } from 'firebase-admin';
+
+// Re-export Timestamp type for convenience
+export type Timestamp = firestore.Timestamp;
 
 /** Purpose of the OTP */
 export type OTPPurpose = 'login' | 'signup' | 'family-verification' | 'password-reset';

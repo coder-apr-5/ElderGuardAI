@@ -2,7 +2,10 @@
 // User Type Definitions
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { Timestamp } from 'firebase-admin/firestore';
+import type { firestore } from 'firebase-admin';
+
+// Use Timestamp from firestore namespace
+type Timestamp = firestore.Timestamp;
 
 /** User roles in the ElderNest system */
 export type UserRole = 'elder' | 'family';

@@ -8,7 +8,8 @@ import { sendOTP, verifyOTP } from './otp.service';
 import { validatePhoneNumber, isPhoneRegistered } from './phone.service';
 import { logger } from '../utils/logger';
 import type { PendingConnection, FamilyRelation, OTPMetadata } from '../types';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
+const { Timestamp, FieldValue } = admin.firestore;
 
 /**
  * Create a pending connection for elder signup

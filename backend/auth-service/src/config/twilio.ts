@@ -2,15 +2,15 @@
 // Twilio SMS Configuration
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import twilio from 'twilio';
+import { Twilio } from 'twilio';
 import { logger } from '../utils/logger';
 
-let twilioClient: twilio.Twilio | null = null;
+let twilioClient: Twilio | null = null;
 
 /**
  * Initialize Twilio client
  */
-export function initializeTwilio(): twilio.Twilio | null {
+export function initializeTwilio(): Twilio | null {
     if (twilioClient) {
         return twilioClient;
     }
@@ -25,7 +25,7 @@ export function initializeTwilio(): twilio.Twilio | null {
     }
 
     try {
-        twilioClient = twilio(accountSid, authToken);
+        twilioClient = new Twilio(accountSid, authToken);
         logger.info('Twilio client initialized successfully');
         return twilioClient;
     } catch (error) {
@@ -37,7 +37,7 @@ export function initializeTwilio(): twilio.Twilio | null {
 /**
  * Get Twilio client instance
  */
-export function getTwilioClient(): twilio.Twilio | null {
+export function getTwilioClient(): Twilio | null {
     if (!twilioClient) {
         return initializeTwilio();
     }
