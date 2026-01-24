@@ -1,253 +1,550 @@
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Family Signup Page
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, Phone, User, Users, QrCode, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import PhoneInput from '../../components/auth/PhoneInput';
+import { familySignup } from '../../services/authApi';
 
-import {
-    FormInput,
-    GradientButton,
-    signUpFamily,
-    familySignupSchema,
-    type FamilySignupFormData,
-    getFriendlyErrorMessage
-} from '@elder-nest/shared';
-
-const SignupPage = () => {
+const FamilySignupPage: React.FC = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);
-    const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    // Initialize form
-    const { register, handleSubmit, trigger, watch, formState: { errors } } = useForm<FamilySignupFormData>({
-        resolver: zodResolver(familySignupSchema),
-        defaultValues: {
-            connectionOption: 'have_code'
-        }
-    });
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [countryCode, setCountryCode] = useState('IN');
+    const [showPassword, setShowPassword] = useState(false);
+    const [agreeTerms, setAgreeTerms] = useState(false);
 
-    const connectionOption = watch('connectionOption');
-
-    const nextStep = async () => {
-        let fields: (keyof FamilySignupFormData)[] = [];
-        if (step === 1) fields = ['email', 'password', 'confirmPassword'];
-        if (step === 2) fields = ['fullName', 'countryCode', 'phone', 'relationship'];
-
-        const isValid = await trigger(fields);
-        if (isValid) setStep(step + 1);
+    const handlePhoneChange = (newPhone: string, newCountryCode: string) => {
+        setPhone(newPhone);
+        setCountryCode(newCountryCode);
     };
 
-    const onSubmit = async (data: FamilySignupFormData) => {
+    const validateForm = (): string | null => {
+        if (!fullName.trim()) {
+            return 'Please enter your full name';
+        }
+        if (!email.trim()) {
+            return 'Please enter your email';
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return 'Please enter a valid email address';
+        }
+        if (!password) {
+            return 'Please enter a password';
+        }
+        if (password.length < 8) {
+            return 'Password must be at least 8 characters';
+        }
+        if (!/[A-Z]/.test(password)) {
+            return 'Password must contain at least one uppercase letter';
+        }
+        if (!/[a-z]/.test(password)) {
+            return 'Password must contain at least one lowercase letter';
+        }
+        if (!/[0-9]/.test(password)) {
+            return 'Password must contain at least one number';
+        }
+        if (password !== confirmPassword) {
+            return 'Passwords do not match';
+        }
+        if (!agreeTerms) {
+            return 'Please agree to the Terms of Service';
+        }
+        return null;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const validationError = validateForm();
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
         setIsLoading(true);
-        setError(null);
+        setError('');
+
         try {
-            await signUpFamily(data);
-            navigate('/dashboard');
-        } catch (err: any) {
-            setError(getFriendlyErrorMessage(err.code));
+            const result = await familySignup({
+                email: email.trim().toLowerCase(),
+                password,
+                fullName: fullName.trim(),
+                phone: phone || undefined,
+                countryCode: phone ? countryCode : undefined,
+            });
+
+            if (result.success) {
+                navigate('/family/dashboard');
+            } else {
+                setError(result.message || 'Signup failed');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Signup failed');
         } finally {
             setIsLoading(false);
         }
     };
 
+    // Password strength indicator
+    const getPasswordStrength = (): { strength: number; label: string; color: string } => {
+        if (!password) return { strength: 0, label: '', color: '#e2e8f0' };
+
+        let strength = 0;
+        if (password.length >= 8) strength++;
+        if (/[A-Z]/.test(password)) strength++;
+        if (/[a-z]/.test(password)) strength++;
+        if (/[0-9]/.test(password)) strength++;
+        if (/[^A-Za-z0-9]/.test(password)) strength++;
+
+        if (strength <= 2) return { strength: 1, label: 'Weak', color: '#ef4444' };
+        if (strength <= 3) return { strength: 2, label: 'Medium', color: '#f59e0b' };
+        if (strength <= 4) return { strength: 3, label: 'Strong', color: '#10b981' };
+        return { strength: 4, label: 'Very Strong', color: '#059669' };
+    };
+
+    const passwordStrength = getPasswordStrength();
+
     return (
-        <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
-            <div className="w-full max-w-6xl mx-auto flex flex-col md:flex-row shadow-2xl my-auto bg-white dark:bg-gray-800 rounded-3xl overflow-hidden m-4 min-h-[600px]">
-
-                {/* Sidebar Progress */}
-                <div className="w-full md:w-1/3 bg-gray-900 text-white p-10 flex flex-col justify-between relative overflow-hidden">
-
-                    {/* Progress Steps */}
-                    <div className="z-10 mt-10 space-y-8">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'bg-indigo-600 border-indigo-600' : 'border-gray-600 text-gray-400'}`}>1</div>
-                            <span className={step >= 1 ? 'font-semibold text-white' : 'text-gray-400'}>Account Details</span>
-                        </div>
-                        <div className="w-0.5 h-8 bg-gray-700 ml-5"></div>
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'bg-indigo-600 border-indigo-600' : 'border-gray-600 text-gray-400'}`}>2</div>
-                            <span className={step >= 2 ? 'font-semibold text-white' : 'text-gray-400'}>Personal Info</span>
-                        </div>
-                        <div className="w-0.5 h-8 bg-gray-700 ml-5"></div>
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${step >= 3 ? 'bg-indigo-600 border-indigo-600' : 'border-gray-600 text-gray-400'}`}>3</div>
-                            <span className={step >= 3 ? 'font-semibold text-white' : 'text-gray-400'}>Connect Elder</span>
-                        </div>
-                    </div>
-
-                    <div className="z-10 mt-auto">
-                        <p className="text-gray-400 text-sm">Already have an account? <Link to="/auth/login" className="text-white hover:underline">Log in</Link></p>
-                    </div>
-
-                    {/* Background Blob */}
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
+        <div className="auth-page">
+            <div className="auth-container">
+                <div className="auth-header">
+                    <div className="auth-logo">👨‍👩‍👧</div>
+                    <h1 className="auth-title">Create Family Account</h1>
+                    <p className="auth-subtitle">Join ElderNest to care for your loved ones</p>
                 </div>
 
-                {/* Main Form Area */}
-                <div className="flex-1 p-10 md:p-16 relative">
-                    <div className="max-w-lg mx-auto">
-                        <h2 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Create Family Account</h2>
-
-                        <form onSubmit={handleSubmit(onSubmit)}>
-                            <AnimatePresence mode="wait">
-                                {step === 1 && (
-                                    <motion.div
-                                        key="step1"
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="space-y-4"
-                                    >
-                                        <FormInput label="Email" type="email" icon={Mail} sizeVariant="family" {...register('email')} error={errors.email?.message} />
-                                        <FormInput label="Password" type="password" icon={Lock} sizeVariant="family" {...register('password')} error={errors.password?.message} />
-                                        <FormInput label="Confirm Password" type="password" icon={Lock} sizeVariant="family" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
-                                        <GradientButton type="button" onClick={nextStep} className="w-full mt-6">Next Step</GradientButton>
-                                    </motion.div>
-                                )}
-
-                                {step === 2 && (
-                                    <motion.div
-                                        key="step2"
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="space-y-4"
-                                    >
-                                        <FormInput label="Full Name" icon={User} sizeVariant="family" {...register('fullName')} error={errors.fullName?.message} />
-
-                                        {/* Phone Number with Country Code */}
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
-                                            <div className="flex gap-2">
-                                                <select
-                                                    {...register('countryCode')}
-                                                    className="w-32 h-14 px-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-sm"
-                                                >
-                                                    <option value="">Code</option>
-                                                    <option value="+1">🇺🇸 +1</option>
-                                                    <option value="+44">🇬🇧 +44</option>
-                                                    <option value="+91">🇮🇳 +91</option>
-                                                    <option value="+86">🇨🇳 +86</option>
-                                                    <option value="+81">🇯🇵 +81</option>
-                                                    <option value="+49">🇩🇪 +49</option>
-                                                    <option value="+33">🇫🇷 +33</option>
-                                                    <option value="+61">🇦🇺 +61</option>
-                                                    <option value="+55">🇧🇷 +55</option>
-                                                    <option value="+52">🇲🇽 +52</option>
-                                                    <option value="+7">🇷🇺 +7</option>
-                                                    <option value="+82">🇰🇷 +82</option>
-                                                    <option value="+39">🇮🇹 +39</option>
-                                                    <option value="+34">🇪🇸 +34</option>
-                                                    <option value="+31">🇳🇱 +31</option>
-                                                    <option value="+46">🇸🇪 +46</option>
-                                                    <option value="+47">🇳🇴 +47</option>
-                                                    <option value="+41">🇨🇭 +41</option>
-                                                    <option value="+971">🇦🇪 +971</option>
-                                                    <option value="+966">🇸🇦 +966</option>
-                                                    <option value="+65">🇸🇬 +65</option>
-                                                    <option value="+60">🇲🇾 +60</option>
-                                                    <option value="+63">🇵🇭 +63</option>
-                                                    <option value="+62">🇮🇩 +62</option>
-                                                    <option value="+84">🇻🇳 +84</option>
-                                                    <option value="+27">🇿🇦 +27</option>
-                                                    <option value="+234">🇳🇬 +234</option>
-                                                    <option value="+20">🇪🇬 +20</option>
-                                                </select>
-                                                <input
-                                                    type="tel"
-                                                    {...register('phone')}
-                                                    placeholder="Phone number"
-                                                    className="flex-1 h-14 px-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:border-indigo-500 transition-all"
-                                                />
-                                            </div>
-                                            {errors.countryCode && <p className="text-red-500 text-sm">{errors.countryCode.message}</p>}
-                                            {errors.phone && <p className="text-red-500 text-sm">{errors.phone.message}</p>}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Relationship to Elder</label>
-                                            <select
-                                                {...register('relationship')}
-                                                className="w-full h-14 px-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:border-indigo-500"
-                                            >
-                                                <option value="">Select relationship</option>
-                                                <option value="son">Son</option>
-                                                <option value="daughter">Daughter</option>
-                                                <option value="caregiver">Caregiver</option>
-                                                <option value="other">Other</option>
-                                            </select>
-                                            {errors.relationship && <p className="text-red-500 text-sm">{errors.relationship.message}</p>}
-                                        </div>
-
-                                        <GradientButton type="button" onClick={nextStep} className="w-full mt-6">Next Step</GradientButton>
-                                    </motion.div>
-                                )}
-
-                                {step === 3 && (
-                                    <motion.div
-                                        key="step3"
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="space-y-6"
-                                    >
-                                        <div className="space-y-4">
-                                            <label className={`block p-4 border-2 rounded-xl cursor-pointer transition ${connectionOption === 'have_code' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <input type="radio" value="have_code" {...register('connectionOption')} className="w-5 h-5 text-indigo-600" />
-                                                    <div>
-                                                        <div className="font-semibold text-gray-900">I have an invitation code</div>
-                                                        <div className="text-sm text-gray-500">My elder already has the app</div>
-                                                    </div>
-                                                </div>
-                                            </label>
-
-                                            <label className={`block p-4 border-2 rounded-xl cursor-pointer transition ${connectionOption === 'later' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <input type="radio" value="later" {...register('connectionOption')} className="w-5 h-5 text-indigo-600" />
-                                                    <div>
-                                                        <div className="font-semibold text-gray-900">My elder will join later</div>
-                                                        <div className="text-sm text-gray-500">I'll invite them after signup</div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-
-                                        {connectionOption === 'have_code' && (
-                                            <div className="mt-4">
-                                                <FormInput
-                                                    label="6-Digit Connection Code"
-                                                    placeholder="XXX-XXX"
-                                                    sizeVariant="family"
-                                                    {...register('connectionCode')}
-                                                    error={errors.connectionCode?.message}
-                                                    className="text-center tracking-widest uppercase font-mono"
-                                                />
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-start gap-3 mt-4">
-                                            <input type="checkbox" {...register('agreeToTerms')} className="mt-1 w-5 h-5 text-indigo-600" />
-                                            <span className="text-sm text-gray-600">I agree to Terms & Privacy Policy</span>
-                                        </div>
-                                        {errors.agreeToTerms && <p className="text-red-500 text-sm">{errors.agreeToTerms.message}</p>}
-
-                                        {error && <p className="text-red-500 text-center">{error}</p>}
-
-                                        <GradientButton type="submit" loading={isLoading} className="w-full mt-4" size="family">
-                                            Complete Signup
-                                        </GradientButton>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </form>
+                <form onSubmit={handleSubmit} className="auth-form">
+                    <div className="form-group">
+                        <label htmlFor="fullName">Full Name</label>
+                        <input
+                            id="fullName"
+                            type="text"
+                            value={fullName}
+                            onChange={e => setFullName(e.target.value)}
+                            placeholder="Enter your full name"
+                            disabled={isLoading}
+                        />
                     </div>
+
+                    <div className="form-group">
+                        <label htmlFor="email">Email Address</label>
+                        <input
+                            id="email"
+                            type="email"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            placeholder="your@email.com"
+                            disabled={isLoading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="password">Password</label>
+                        <div className="password-input-wrapper">
+                            <input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="Create a strong password"
+                                disabled={isLoading}
+                            />
+                            <button
+                                type="button"
+                                className="toggle-password"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? '🙈' : '👁️'}
+                            </button>
+                        </div>
+                        {password && (
+                            <div className="password-strength">
+                                <div className="strength-bars">
+                                    {[1, 2, 3, 4].map(level => (
+                                        <div
+                                            key={level}
+                                            className="strength-bar"
+                                            style={{
+                                                background: passwordStrength.strength >= level
+                                                    ? passwordStrength.color
+                                                    : '#e2e8f0'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <span style={{ color: passwordStrength.color }}>
+                                    {passwordStrength.label}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="confirmPassword">Confirm Password</label>
+                        <input
+                            id="confirmPassword"
+                            type={showPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm your password"
+                            disabled={isLoading}
+                            className={confirmPassword && confirmPassword !== password ? 'error' : ''}
+                        />
+                        {confirmPassword && confirmPassword !== password && (
+                            <span className="field-error">Passwords don't match</span>
+                        )}
+                    </div>
+
+                    <PhoneInput
+                        label="Phone Number (Optional)"
+                        value={phone}
+                        onChange={handlePhoneChange}
+                        placeholder="Enter your phone number"
+                        disabled={isLoading}
+                    />
+
+                    <div className="terms-checkbox">
+                        <input
+                            type="checkbox"
+                            id="agreeTerms"
+                            checked={agreeTerms}
+                            onChange={e => setAgreeTerms(e.target.checked)}
+                        />
+                        <label htmlFor="agreeTerms">
+                            I agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>
+                        </label>
+                    </div>
+
+                    {error && <p className="error-message">{error}</p>}
+
+                    <button
+                        type="submit"
+                        className="auth-button primary"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <span className="loading-spinner"></span>
+                        ) : (
+                            'Create Account'
+                        )}
+                    </button>
+                </form>
+
+                <div className="auth-divider">
+                    <span>or</span>
+                </div>
+
+                <button className="auth-button google-button">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+                    Continue with Google
+                </button>
+
+                <div className="auth-footer">
+                    <p>Already have an account?</p>
+                    <Link to="/auth/login/email">Login</Link>
+                </div>
+
+                <div className="elder-signup-link">
+                    <p>Are you an elder?</p>
+                    <Link to="/auth/signup/elder">Create Elder Account →</Link>
                 </div>
             </div>
+
+            <style>{`
+        .auth-page {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .auth-container {
+          width: 100%;
+          max-width: 440px;
+          background: white;
+          border-radius: 24px;
+          padding: 40px;
+          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        .auth-header {
+          text-align: center;
+          margin-bottom: 32px;
+        }
+
+        .auth-logo {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+
+        .auth-title {
+          font-size: 28px;
+          font-weight: 700;
+          color: #1a202c;
+          margin: 0 0 8px 0;
+        }
+
+        .auth-subtitle {
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .auth-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .form-group label {
+          font-size: 14px;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        .form-group input {
+          height: 48px;
+          padding: 0 16px;
+          border: 2px solid #e2e8f0;
+          border-radius: 12px;
+          font-size: 16px;
+          transition: all 0.2s ease;
+          outline: none;
+        }
+
+        .form-group input:focus {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .form-group input.error {
+          border-color: #ef4444;
+        }
+
+        .password-input-wrapper {
+          position: relative;
+        }
+
+        .password-input-wrapper input {
+          width: 100%;
+          padding-right: 48px;
+        }
+
+        .toggle-password {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+        }
+
+        .password-strength {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .strength-bars {
+          display: flex;
+          gap: 4px;
+          flex: 1;
+        }
+
+        .strength-bar {
+          height: 4px;
+          flex: 1;
+          border-radius: 2px;
+          transition: background 0.3s ease;
+        }
+
+        .password-strength span {
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .field-error {
+          color: #ef4444;
+          font-size: 12px;
+        }
+
+        .terms-checkbox {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .terms-checkbox input {
+          margin-top: 4px;
+          width: 16px;
+          height: 16px;
+        }
+
+        .terms-checkbox label {
+          font-size: 13px;
+          color: #6b7280;
+          line-height: 1.5;
+        }
+
+        .terms-checkbox a {
+          color: #6366f1;
+          text-decoration: none;
+        }
+
+        .terms-checkbox a:hover {
+          text-decoration: underline;
+        }
+
+        .error-message {
+          color: #ef4444;
+          font-size: 14px;
+          margin: 0;
+          text-align: center;
+        }
+
+        .auth-button {
+          height: 52px;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          text-decoration: none;
+          border: none;
+        }
+
+        .auth-button.primary {
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          color: white;
+        }
+
+        .auth-button.primary:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .auth-button.primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .auth-button.google-button {
+          background: white;
+          color: #374151;
+          border: 2px solid #e2e8f0;
+        }
+
+        .auth-button.google-button:hover {
+          background: #f8fafc;
+        }
+
+        .auth-button.google-button img {
+          width: 20px;
+          height: 20px;
+        }
+
+        .loading-spinner {
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .auth-divider {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin: 24px 0;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #e2e8f0;
+        }
+
+        .auth-divider span {
+          color: #9ca3af;
+          font-size: 14px;
+        }
+
+        .auth-footer {
+          text-align: center;
+          margin-top: 24px;
+        }
+
+        .auth-footer p {
+          color: #6b7280;
+          margin: 0 0 8px 0;
+        }
+
+        .auth-footer a {
+          color: #6366f1;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .auth-footer a:hover {
+          text-decoration: underline;
+        }
+
+        .elder-signup-link {
+          text-align: center;
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .elder-signup-link p {
+          color: #6b7280;
+          margin: 0 0 4px 0;
+          font-size: 14px;
+        }
+
+        .elder-signup-link a {
+          color: #10b981;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .elder-signup-link a:hover {
+          text-decoration: underline;
+        }
+      `}</style>
         </div>
     );
 };
 
-export default SignupPage;
+export default FamilySignupPage;
