@@ -1,58 +1,99 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Python ML Service - Git Ignore
+# ElderNest AI - ML Service .gitignore
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ━━━ Credentials & Secrets ━━━
-.env
-.env.local
-.env.*.local
-*.pem
-*.key
-*.p12
-credentials*.json
-*-credentials.json
-service-account*.json
-
-# ━━━ Python ━━━
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# ━━━ Virtual Environment ━━━
+# Virtual environments
 venv/
+.venv/
 ENV/
 env/
-.venv/
+.env
+.env.local
 
-# ━━━ ML Models (large files) ━━━
-*.pkl
-*.h5
-*.model
-*.weights
-*.onnx
-*.pb
-trained_models/*.pkl
-trained_models/*.h5
-
-# ━━━ IDE & Editor ━━━
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# ━━━ OS Files ━━━
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+logs/
+*.log
+
+# OS
 .DS_Store
 Thumbs.db
 
-# ━━━ Testing ━━━
-.pytest_cache/
-htmlcov/
-.coverage
+# Trained models (optional - uncomment to track)
+# trained_models/*.pkl
 
-# ━━━ Misc ━━━
+# DeepFace / TensorFlow models
+.deepface/
+~/.deepface/
+
+# MediaPipe
+mediapipe/
+
+# Large files
+*.h5
+*.hdf5
+*.onnx
+*.pt
+*.pth
+
+# Firebase service account (NEVER commit this!)
+*serviceAccountKey*.json
+firebase-adminsdk*.json
+
+# Temporary files
+tmp/
+temp/
 *.tmp
 *.temp
-.cache/
+
+# Docker
+.docker/
+
+# Local data
+data/
+uploads/

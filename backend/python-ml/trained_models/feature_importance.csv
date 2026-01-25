@@ -1,0 +1,16 @@
+feature,importance
+camera_inactivity_hours,0.18954026301445115
+eating_irregularity,0.16182092924391775
+medicine_missed,0.1490430041964459
+sad_mood_count,0.09481677328091408
+lonely_mentions,0.08971964221878899
+pain_expression_count,0.08846129149251389
+inactive_days,0.06185116220764716
+avg_facial_emotion_score,0.052027000076783715
+health_complaints,0.048640803640018104
+avg_sentiment_7days,0.03919207333871279
+sleep_quality_score,0.010002387476384678
+fall_detected_count,0.006608560904627427
+days_without_eating,0.004171634609692309
+distress_episodes,0.0041044742990994166
+emergency_button_presses,2.6856545580911433e-15
