@@ -22,7 +22,7 @@ mediapipe==0.10.14
 
 # Image Processing
 pillow==10.2.0
-python-multipart==0.0.6
+python-multipart==0.0.18
 
 # Firebase (Firestore + FCM)
 firebase-admin==6.3.0
