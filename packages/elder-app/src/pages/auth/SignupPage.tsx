@@ -15,7 +15,7 @@ import {
 
 type ElderSignupFormData = z.infer<typeof elderSignupSchema>;
 
-const ElderSignupForm = () => {
+const SignupPage = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ const ElderSignupForm = () => {
         } catch (err: any) {
             console.error("Signup error:", err);
             setError(getFriendlyErrorMessage(err.code) || "Signup failed. Please try again.");
-            setIsLoading(false); 
+            setIsLoading(false);
         }
     };
 
@@ -123,20 +123,11 @@ const ElderSignupForm = () => {
 
                     {/* Step Progress */}
                     <div className="space-y-3">
-<<<<<<< Updated upstream
-                        {[1, 2, 3].map((s) => (
+                        {[1, 2].map((s) => (
                             <div
                                 key={s}
                                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${s === step ? 'bg-white/20 backdrop-blur-sm' : 'opacity-60'
                                     }`}
-=======
-                        {[1, 2].map((s) => (
-                            <div 
-                                key={s} 
-                                className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                                    s === step ? 'bg-white/20 backdrop-blur-sm' : 'opacity-60'
-                                }`}
->>>>>>> Stashed changes
                             >
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${s < step ? 'bg-green-400 text-white' :
                                     s === step ? 'bg-white text-orange-500' :
@@ -181,13 +172,8 @@ const ElderSignupForm = () => {
 
                     {/* Step Indicator (Mobile) */}
                     <div className="lg:hidden flex justify-center gap-2 mb-6">
-<<<<<<< Updated upstream
-                        {[1, 2, 3].map((s) => (
-                            <div
-=======
                         {[1, 2].map((s) => (
-                            <div 
->>>>>>> Stashed changes
+                            <div
                                 key={s}
                                 className={`w-3 h-3 rounded-full transition-all ${s <= step ? 'bg-orange-500' : 'bg-gray-200'
                                     } ${s === step ? 'scale-125' : ''}`}
@@ -451,4 +437,4 @@ const ElderSignupForm = () => {
     );
 };
 
-export default ElderSignupForm;
+export default SignupPage;
