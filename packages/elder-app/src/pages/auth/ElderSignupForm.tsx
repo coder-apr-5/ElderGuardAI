@@ -29,9 +29,15 @@ const ElderSignupForm = () => {
     const nextStep = async () => {
         let fieldsToValidate: (keyof ElderSignupFormData)[] = [];
         if (step === 1) fieldsToValidate = ['fullName', 'email', 'password', 'confirmPassword'];
-        if (step === 2) fieldsToValidate = ['dateOfBirth', 'emergencyContact'];
+        if (step === 2) fieldsToValidate = ['dateOfBirth', 'emergencyContact', 'relationship'];
 
         const isValid = await trigger(fieldsToValidate);
+
+        console.log(`Step ${step} validation result:`, isValid);
+        if (!isValid) {
+            console.log("Validation errors:", errors);
+        }
+
         if (isValid) {
             setStep(prev => prev + 1);
             setError(null);
@@ -58,6 +64,7 @@ const ElderSignupForm = () => {
     const stepTitles = [
         { title: 'Account Details', subtitle: 'Create your login credentials' },
         { title: 'Personal Info', subtitle: 'Tell us a bit about yourself' },
+        { title: 'Verification', subtitle: 'Verify family contact' },
     ];
 
     return (
@@ -123,7 +130,7 @@ const ElderSignupForm = () => {
 
                     {/* Step Progress */}
                     <div className="space-y-3">
-                        {[1, 2].map((s) => (
+                        {[1, 2, 3].map((s) => (
                             <div
                                 key={s}
                                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${s === step ? 'bg-white/20 backdrop-blur-sm' : 'opacity-60'
@@ -172,7 +179,7 @@ const ElderSignupForm = () => {
 
                     {/* Step Indicator (Mobile) */}
                     <div className="lg:hidden flex justify-center gap-2 mb-6">
-                        {[1, 2].map((s) => (
+                        {[1, 2, 3].map((s) => (
                             <div
                                 key={s}
                                 className={`w-3 h-3 rounded-full transition-all ${s <= step ? 'bg-orange-500' : 'bg-gray-200'
@@ -285,9 +292,9 @@ const ElderSignupForm = () => {
                                         {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message?.toString()}</p>}
                                     </div>
 
-                                    {/* Emergency Contact with Country Code */}
+                                    {/* Family Member's Phone Number (was Emergency Contact) */}
                                     <div>
-                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Emergency Contact</label>
+                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Family Member's Phone Number</label>
                                         <div className="flex gap-2">
                                             <select
                                                 className="w-28 px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white text-sm"
@@ -341,6 +348,58 @@ const ElderSignupForm = () => {
                                         </p>
                                     </div>
                                     {errors.agreeToTerms && <p className="text-red-500 text-xs mt-1">{errors.agreeToTerms.message}</p>}
+
+                                    {/* Relationship */}
+                                    <div>
+                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Relationship to Family Member</label>
+                                        <select
+                                            {...register('relationship')}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
+                                        >
+                                            <option value="">Select Relationship</option>
+                                            <option value="son">Son</option>
+                                            <option value="daughter">Daughter</option>
+                                            <option value="spouse">Spouse</option>
+                                            <option value="caregiver">Caregiver</option>
+                                            <option value="sibling">Sibling</option>
+                                            <option value="grandchild">Grandchild</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                        {errors.relationship && <p className="text-red-500 text-xs mt-1">{errors.relationship.message}</p>}
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {step === 3 && (
+                                <motion.div
+                                    key="step3"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    className="space-y-4"
+                                >
+                                    <div className="bg-orange-50 p-3 rounded-xl text-orange-800 text-sm">
+                                        We sent a verification code to your family member's number.
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Verification Code</label>
+                                        <div className="relative">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                placeholder="Enter 6-digit code"
+                                                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white tracking-widest text-lg font-mono"
+                                                onChange={(e) => {
+                                                    // Simple validation visual feedback could go here
+                                                }}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Normally you would receive an SMS. For this demo, please enter any code.
+                                        </p>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -370,7 +429,7 @@ const ElderSignupForm = () => {
                                 </motion.button>
                             )}
 
-                            {step < 2 ? (
+                            {step < 3 ? (
                                 <motion.button
                                     type="button"
                                     onClick={nextStep}

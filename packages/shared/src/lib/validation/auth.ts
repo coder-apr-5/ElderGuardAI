@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Phone validation regex - supports formats like +1234567890, +91 9876543210, etc.
-const phoneRegex = /^\+[1-9]\d{0,2}[\s-]?\d{6,14}$/;
+const phoneRegex = /^\+[1-9]\d{0,2}[\s-]*\d{6,14}$/;
 
 // Common schemas
 export const loginSchema = z.object({
@@ -24,6 +24,9 @@ export const elderSignupSchema = z.object({
     emergencyContact: z.string().regex(phoneRegex, 'Please enter a valid phone number with country code (e.g., +1 234 567 8900)'),
     connectionCode: z.string().length(6, 'Code must be exactly 6 characters').optional().or(z.literal('')),
     agreeToTerms: z.literal(true, { errorMap: () => ({ message: "You must agree to the Terms and Privacy Policy" }) }),
+    relationship: z.enum(['son', 'daughter', 'spouse', 'caregiver', 'sibling', 'grandchild', 'other'], {
+        errorMap: () => ({ message: 'Please select a relationship' })
+    }),
 }).refine(data => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],

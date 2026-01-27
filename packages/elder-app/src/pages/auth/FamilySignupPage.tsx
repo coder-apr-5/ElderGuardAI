@@ -18,9 +18,21 @@ const familySignupSchema = z.object({
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must agree to the terms' }),
   }),
+  connectionOption: z.enum(['have_code', 'later']).default('have_code'), // Default to entering code as it's a step
+  connectionCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
+}).refine(data => {
+  // If we are at the step where code is required (implied by this page flow), enforce it
+  // Or if connectionOption is 'have_code'
+  if (data.connectionOption === 'have_code') {
+    return data.connectionCode && data.connectionCode.length === 6;
+  }
+  return true;
+}, {
+  message: "Please enter the 6-digit code",
+  path: ["connectionCode"],
 });
 
 type FamilySignupFormData = z.infer<typeof familySignupSchema>;
@@ -35,13 +47,16 @@ const FamilySignupPage = () => {
     resolver: zodResolver(familySignupSchema),
     mode: 'onChange',
     defaultValues: {
-      countryCode: '+91'
+      countryCode: '+91',
+      connectionOption: 'have_code'
     }
   });
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof FamilySignupFormData)[] = [];
     if (step === 1) fieldsToValidate = ['fullName', 'email', 'password', 'confirmPassword'];
+
+    if (step === 2) fieldsToValidate = ['phone', 'countryCode', 'agreeToTerms'];
 
     const isValid = await trigger(fieldsToValidate);
     if (isValid) {
@@ -74,6 +89,7 @@ const FamilySignupPage = () => {
   const stepTitles = [
     { title: 'Account Details', subtitle: 'Create your login credentials' },
     { title: 'Contact Info', subtitle: 'How can we reach you?' },
+    { title: 'Verification', subtitle: 'Enter family code' },
   ];
 
   return (
@@ -132,7 +148,7 @@ const FamilySignupPage = () => {
 
           {/* Step Progress */}
           <div className="space-y-3">
-            {[1, 2].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div
                 key={s}
                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${s === step ? 'bg-white/20 backdrop-blur-sm' : 'opacity-60'
@@ -181,7 +197,7 @@ const FamilySignupPage = () => {
 
           {/* Step Indicator (Mobile) */}
           <div className="lg:hidden flex justify-center gap-2 mb-6">
-            {[1, 2].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div
                 key={s}
                 className={`w-3 h-3 rounded-full transition-all ${s <= step ? 'bg-teal-600' : 'bg-gray-200'
@@ -326,6 +342,41 @@ const FamilySignupPage = () => {
                   {errors.agreeToTerms && <p className="text-red-500 text-xs mt-1">{errors.agreeToTerms.message}</p>}
                 </motion.div>
               )}
+
+              {step === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <div className="bg-teal-50 p-3 rounded-xl text-teal-800 text-sm">
+                    Enter the unique family code found on your loved one's dashboard.
+                  </div>
+
+                  {/* Family Code */}
+                  <div>
+                    <label className="block text-gray-700 font-medium mb-1 text-sm">Family Code</label>
+                    <div className="relative">
+                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        {...register('connectionCode')}
+                        placeholder="Enter 6-digit code"
+                        maxLength={6}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white tracking-widest text-lg font-mono uppercase"
+                        onChange={(e) => {
+                          setValue('connectionOption', 'have_code');
+                          // default valid behavior
+                          register('connectionCode').onChange(e);
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">This connects your account to your elder.</p>
+                    {errors.connectionCode && <p className="text-red-500 text-xs mt-1">{errors.connectionCode.message}</p>}
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Error Message */}
@@ -353,7 +404,7 @@ const FamilySignupPage = () => {
                 </motion.button>
               )}
 
-              {step < 2 ? (
+              {step < 3 ? (
                 <motion.button
                   type="button"
                   onClick={nextStep}
