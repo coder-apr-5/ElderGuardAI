@@ -16,19 +16,23 @@ export const CameraMoodDetector = ({ onCapture, isAnalyzing }: CameraMoodDetecto
 
     const startCamera = async () => {
         try {
+            console.log("Requesting camera access...");
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "user" }
             });
+            console.log("Camera access granted, stream:", mediaStream.id);
             setStream(mediaStream);
             setIsActive(true);
             setError(null);
 
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
+                // Explicitly play to ensure mobile compatibility
+                videoRef.current.play().catch(e => console.error("Error playing video:", e));
             }
         } catch (err) {
             console.error("Error accessing camera:", err);
-            setError("Could not access camera. Please check permissions.");
+            setError("Could not access camera. Please check permissions and ensure no other app is using it.");
         }
     };
 
@@ -42,20 +46,34 @@ export const CameraMoodDetector = ({ onCapture, isAnalyzing }: CameraMoodDetecto
 
     // Capture image from video stream
     const captureImage = () => {
-        if (!videoRef.current || !canvasRef.current || isAnalyzing) return;
+        if (!videoRef.current || !canvasRef.current || isAnalyzing) {
+            console.warn("Capture aborted: Refs missing or analyzing");
+            return;
+        }
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
         const context = canvas.getContext("2d");
 
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            console.warn("Video not ready yet");
+            return;
+        }
+
         if (context) {
+            console.log("Capturing image...", video.videoWidth, video.videoHeight);
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const imageData = canvas.toDataURL("image/jpeg", 0.8);
-            onCapture(imageData);
-            stopCamera(); // Stop after capture to save battery/privacy
+            try {
+                const imageData = canvas.toDataURL("image/jpeg", 0.8);
+                onCapture(imageData);
+                stopCamera(); // Stop after capture to save battery/privacy
+            } catch (e) {
+                console.error("Canvas to DataURL failed:", e);
+                setError("Failed to process image.");
+            }
         }
     };
 
