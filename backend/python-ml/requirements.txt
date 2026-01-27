@@ -28,7 +28,7 @@ python-multipart==0.0.6
 firebase-admin==6.3.0
 
 # External Integrations
-requests==2.31.0
+requests==2.32.4
 twilio==8.10.0
 
 # Utilities
