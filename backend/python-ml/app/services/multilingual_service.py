@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 class MultilingualAssistant:
     def __init__(self):
         # Initialize clients with API keys from environment
-        self.whisper_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        openai_key = os.getenv('OPENAI_API_KEY')
+        if openai_key and not openai_key.startswith('sk-your-'):
+            self.whisper_client = OpenAI(api_key=openai_key)
+        else:
+            self.whisper_client = None
+            logger.warning("OpenAI API key missing or placeholder. Multilingual features will be disabled.")
         
         # Initialize ElevenLabs only if key is present
         eleven_key = os.getenv('ELEVENLABS_API_KEY')

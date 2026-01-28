@@ -1,4 +1,8 @@
-import face_recognition
+try:
+    import face_recognition
+    FACE_REC_AVAILABLE = True
+except ImportError:
+    FACE_REC_AVAILABLE = False
 import numpy as np
 import base64
 import cv2
@@ -22,6 +26,9 @@ class IntruderDetector:
         # Mock database for known faces (In prod, load from Firestore/SQL)
         # Structure: user_id -> { person_id: { encoding: [...], name: '...', relation: '...' } }
         self.known_faces_db = {} 
+        
+        if not FACE_REC_AVAILABLE:
+            logger.warning("IntruderDetector: face_recognition not available. Running in MOCK mode.")
 
     async def detect_intruder(
         self,
@@ -42,6 +49,10 @@ class IntruderDetector:
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Detect locations and encodings
+        if not FACE_REC_AVAILABLE:
+            logger.debug("Mocking intruder detection (face_recognition unavailable)")
+            return self._get_empty_result(timestamp)
+
         face_locations = face_recognition.face_locations(image_rgb)
         face_encodings = face_recognition.face_encodings(image_rgb, face_locations)
         
@@ -105,6 +116,10 @@ class IntruderDetector:
         image = self._decode_image(image_base64)
         if image is None: return False
         
+        if not FACE_REC_AVAILABLE:
+            logger.error("Cannot enroll face: face_recognition not available.")
+            return False
+
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         encodings = face_recognition.face_encodings(image_rgb)
         
@@ -127,6 +142,8 @@ class IntruderDetector:
              
         # known_faces is dict of person_id -> data
         known_encodings = [data['encoding'] for data in known_faces.values()]
+        
+        if not FACE_REC_AVAILABLE: return None
         
         matches = face_recognition.compare_faces(known_encodings, encoding, tolerance=self.FACE_MATCH_THRESHOLD)
         

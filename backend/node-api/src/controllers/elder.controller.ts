@@ -93,7 +93,7 @@ export const getMedicines = async (
 ): Promise<void> => {
   try {
     const userId = req.user!.uid;
-    
+
     const snapshot = await collections.medicines
       .where('userId', '==', userId)
       .where('isActive', '==', true)
@@ -184,7 +184,7 @@ export const triggerEmergency = async (
 
     await firestoreService.logActivity(userId, 'emergency_alert', `Emergency ${type} triggered`);
 
-    sendSuccess(res, { 
+    sendSuccess(res, {
       emergencyId: emergencyRef.id,
       message: 'Emergency alert sent to your family members'
     });
@@ -231,6 +231,27 @@ export const analyzeEmotion = async (
   }
 };
 
+export const analyzeVision = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user!.uid;
+    const { image } = req.body;
+
+    if (!image) {
+      sendBadRequest(res, 'Image is required');
+      return;
+    }
+
+    const result = await mlService.analyzeVisionComprehensive(userId, image);
+    sendSuccess(res, result, 'Vision analysis complete');
+  } catch (error) {
+    logger.error('Vision analysis error:', error);
+    sendServerError(res, 'Failed to analyze vision');
+  }
+};
+
 export default {
   getProfile,
   updateProfile,
@@ -240,4 +261,5 @@ export default {
   triggerEmergency,
   getMoodHistory,
   analyzeEmotion,
+  analyzeVision,
 };

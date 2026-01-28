@@ -6,8 +6,8 @@
 import axios, { AxiosInstance } from 'axios';
 import { config } from '../config/env';
 import { logger, logML } from '../utils/logger';
-import { 
-  MLFeatures, RiskPredictionResponse, EmotionAnalysisResponse, RiskFactor 
+import {
+  MLFeatures, RiskPredictionResponse, EmotionAnalysisResponse, RiskFactor, VisionComprehensiveResponse
 } from '../types';
 import * as firestoreService from './firestore.service';
 
@@ -22,7 +22,7 @@ export const predictRisk = async (
   features: MLFeatures
 ): Promise<RiskPredictionResponse> => {
   const startTime = Date.now();
-  
+
   try {
     const response = await mlClient.post<RiskPredictionResponse>('/api/predict-risk', {
       userId,
@@ -57,7 +57,7 @@ export const predictRisk = async (
   } catch (error) {
     logML('/api/predict-risk', false, Date.now() - startTime);
     logger.error('ML risk prediction error:', error);
-    
+
     // Return fallback prediction
     return fallbackRiskPrediction(features);
   }
@@ -68,7 +68,7 @@ export const analyzeEmotion = async (
   imageBase64: string
 ): Promise<EmotionAnalysisResponse> => {
   const startTime = Date.now();
-  
+
   try {
     const response = await mlClient.post<EmotionAnalysisResponse>('/api/analyze-emotion', {
       userId,
@@ -93,8 +93,57 @@ export const analyzeEmotion = async (
   } catch (error) {
     logML('/api/analyze-emotion', false, Date.now() - startTime);
     logger.error('ML emotion analysis error:', error);
-    
+
     return { emotion: 'Neutral', confidence: 0.5 };
+  }
+};
+
+export const analyzeVisionComprehensive = async (
+  userId: string,
+  imageBase64: string
+): Promise<VisionComprehensiveResponse> => {
+  const startTime = Date.now();
+
+  try {
+    const response = await mlClient.post<VisionComprehensiveResponse>('/api/vision/comprehensive-analysis', {
+      userId,
+      image: imageBase64,
+      timestamp: new Date().toISOString()
+    });
+
+    const result = response.data;
+    logger.debug(`ML Result for ${userId}: fall=${result.fall?.fall_detected}, emotion=${result.emotion?.emotion}`);
+    logML('/api/vision/comprehensive-analysis', true, Date.now() - startTime);
+
+    // If fall detected, we should log it
+    if (result.fall?.fall_detected) {
+      await firestoreService.logActivity(
+        userId,
+        'fall_detected',
+        '⚠️ FALL DETECTED via Camera!',
+        { confidence: result.fall.confidence }
+      );
+    }
+
+    // Save emotion if present
+    if (result.emotion?.emotion) {
+      await firestoreService.saveEmotionData(userId, result.emotion.emotion, result.emotion.confidence || 0.5);
+    }
+
+    return result;
+  } catch (error) {
+    logML('/api/vision/comprehensive-analysis', false, Date.now() - startTime);
+    logger.error('ML comprehensive vision analysis error:', error);
+
+    return {
+      timestamp: new Date().toISOString(),
+      userId,
+      emotion: { emotion: 'Neutral', confidence: 0.5 },
+      fall: { fall_detected: false, confidence: 0 },
+      health_state: { state: 'normal', alert_level: 'none' },
+      security: { intruder_detected: false },
+      alerts: []
+    };
   }
 };
 
@@ -169,4 +218,4 @@ export const checkMLServiceHealth = async (): Promise<boolean> => {
   }
 };
 
-export default { predictRisk, analyzeEmotion, checkMLServiceHealth };
+export default { predictRisk, analyzeEmotion, analyzeVisionComprehensive, checkMLServiceHealth };

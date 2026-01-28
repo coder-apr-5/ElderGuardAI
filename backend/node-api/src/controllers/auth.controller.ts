@@ -7,7 +7,7 @@
 import { Request, Response } from 'express';
 import { sendSuccess, sendError } from '../utils/responses';
 import { logger } from '../utils/logger';
-import { collections } from '../config/firebase';
+// import { collections } from '../config/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/env';
 
@@ -178,7 +178,7 @@ export const elderSignupStep4 = async (req: Request, res: Response) => {
 
 export const phoneLoginStep1 = async (req: Request, res: Response) => {
     try {
-        const { phone, countryCode } = req.body;
+        const { phone, countryCode: _countryCode } = req.body;
         logger.info(`[Auth] Login Step 1 for ${phone}`);
 
         if (shouldUseMockAuth()) {
@@ -233,7 +233,7 @@ export const phoneLoginStep2 = async (req: Request, res: Response) => {
 
 export const familySignup = async (req: Request, res: Response) => {
     try {
-        const { email, password, fullName } = req.body;
+        const { email, password: _password, fullName } = req.body;
 
         if (shouldUseMockAuth()) {
             const uid = `family_${uuidv4()}`;

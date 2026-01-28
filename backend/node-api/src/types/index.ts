@@ -142,7 +142,7 @@ export interface Activity {
   timestamp: Date;
 }
 
-export type ActivityType = 
+export type ActivityType =
   | 'chat'
   | 'mood_log'
   | 'medicine_taken'
@@ -150,6 +150,7 @@ export type ActivityType =
   | 'emergency_alert'
   | 'risk_detected'
   | 'emotion_detected'
+  | 'fall_detected'
   | 'login'
   | 'profile_update';
 
@@ -194,7 +195,7 @@ export interface EmotionResult {
   timestamp: Date;
 }
 
-export type EmotionLabel = 
+export type EmotionLabel =
   | 'Angry'
   | 'Disgust'
   | 'Fear'
@@ -223,7 +224,7 @@ export interface Notification {
   timestamp: Date;
 }
 
-export type NotificationType = 
+export type NotificationType =
   | 'risk_alert'
   | 'emergency'
   | 'medicine_reminder'
@@ -370,4 +371,34 @@ export interface ConnectionResponse {
   elderId: string;
   elderName: string;
   connected: boolean;
+}
+
+export interface VisionComprehensiveResponse {
+  timestamp: string;
+  userId: string;
+  emotion: {
+    emotion: string;
+    confidence: number;
+    all_emotions?: Record<string, number>;
+  };
+  fall: {
+    fall_detected: boolean;
+    confidence: number;
+    posture?: string;
+  };
+  health_state: {
+    state: string;
+    alert_level: string;
+    recommendation?: string;
+  };
+  security: {
+    intruder_detected: boolean;
+    known_person?: boolean;
+    name?: string;
+  };
+  alerts: Array<{
+    type: string;
+    severity: string;
+    message: string;
+  }>;
 }

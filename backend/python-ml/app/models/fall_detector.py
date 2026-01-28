@@ -145,6 +145,8 @@ class FallDetector:
                 'timestamp': datetime.now().isoformat()
             })
             
+            logger.debug(f"Pose: {posture}, Angle: {body_angle:.2f}, Fall: {fall_detected}, Confidence: {confidence:.2f}")
+            
             result = {
                 'fall_detected': fall_detected,
                 'confidence': round(confidence, 3),
@@ -266,8 +268,12 @@ class FallDetector:
         # Convert to angle from horizontal plane
         # 90° = vertical (standing)
         # 0° = horizontal (fallen)
-        body_angle = abs(90 - abs(angle_deg))
+        body_angle = abs(angle_deg)
         
+        # Handle cases where dy is negative (person upside down or leaning back)
+        if body_angle > 90:
+            body_angle = 180 - body_angle
+            
         return body_angle
     
     def _classify_posture(

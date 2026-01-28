@@ -37,7 +37,14 @@ const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.colorize({ all: true }),
   winston.format.printf(({ level, message, timestamp, ...meta }) => {
-    const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
+    let metaStr = '';
+    if (Object.keys(meta).length) {
+      try {
+        metaStr = `\n${JSON.stringify(meta, null, 2)}`;
+      } catch (e) {
+        metaStr = `\n[Circular Data or Unserializable Metadata]`;
+      }
+    }
     return `[${timestamp}] ${level}: ${message}${metaStr}`;
   })
 );

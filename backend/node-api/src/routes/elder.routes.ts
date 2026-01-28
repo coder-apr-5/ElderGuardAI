@@ -85,4 +85,13 @@ router.post('/emergency', elderController.triggerEmergency);
  */
 router.post('/emotion', validate(emotionAnalysisValidation), elderController.analyzeEmotion);
 
+/**
+ * @swagger
+ * /elder/vision:
+ *   post:
+ *     summary: Comprehensive vision analysis
+ *     tags: [Elder]
+ */
+router.post('/vision', elderController.analyzeVision);
+
 export default router;

@@ -32,6 +32,8 @@ export const DashboardPage = () => {
     // 2. Fetch Status for Selected Elder
     const { data: elderStatus, loading: statusLoading } = useElderStatus(selectedElderId);
 
+    const currentElder = elders.find(e => e.uid === selectedElderId) || elders[0];
+
     if (eldersLoading) {
         return <div className="p-8 text-center">Loading family members...</div>;
     }
