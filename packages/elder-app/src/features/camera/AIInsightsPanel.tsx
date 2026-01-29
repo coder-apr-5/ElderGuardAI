@@ -30,9 +30,9 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ result, isAnal
     };
 
     const getRiskStatus = () => {
-        if (result?.fall.fall_detected) return { label: 'FALL DETECTED', icon: AlertCircle, variant: 'critical' };
-        if (result?.health_state.alert_level === 'emergency') return { label: 'EMERGENCY', icon: AlertCircle, variant: 'critical' };
-        if (result?.health_state.alert_level === 'warning') return { label: 'MONITOR', icon: Activity, variant: 'warning' };
+        if (result?.fall?.fall_detected) return { label: 'FALL DETECTED', icon: AlertCircle, variant: 'critical' };
+        if (result?.health_state?.alert_level === 'emergency') return { label: 'EMERGENCY', icon: AlertCircle, variant: 'critical' };
+        if (result?.health_state?.alert_level === 'warning') return { label: 'MONITOR', icon: Activity, variant: 'warning' };
         return { label: 'SAFE', icon: CheckCircle2, variant: 'safe' };
     };
 
@@ -77,12 +77,12 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ result, isAnal
                                 <span className="text-[10px] font-bold uppercase">Mood</span>
                             </div>
                             <p className="text-lg font-bold text-white capitalize">
-                                {result.emotion.emotion}
+                                {result?.emotion?.emotion || 'Neutral'}
                             </p>
                             <div className="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
                                 <motion.div
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${result.emotion.confidence * 100}%` }}
+                                    animate={{ width: `${(result?.emotion?.confidence || 0) * 100}%` }}
                                     className="h-full bg-indigo-500"
                                 />
                             </div>
@@ -94,10 +94,10 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ result, isAnal
                                 <span className="text-[10px] font-bold uppercase">Body Pose</span>
                             </div>
                             <p className="text-lg font-bold text-white">
-                                {result.fall.posture || 'Detecting...'}
+                                {result?.fall?.posture || 'Detecting...'}
                             </p>
                             <p className="text-[10px] text-indigo-300 font-medium">
-                                Angle: {result.fall.body_angle}° {result.fall.pose_detected ? '• Active' : '• Search...'}
+                                Angle: {result?.fall?.body_angle ?? 0}° {result?.fall?.pose_detected ? '• Active' : '• Search...'}
                             </p>
                         </div>
                     </div>
@@ -110,7 +110,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ result, isAnal
                         </h5>
                         <div className="space-y-1 max-h-[100px] overflow-y-auto pr-2 custom-scrollbar">
                             <AnimatePresence mode="popLayout">
-                                {result.alerts.length > 0 ? (
+                                {result?.alerts && result.alerts.length > 0 ? (
                                     result.alerts.map((alert, idx) => (
                                         <motion.div
                                             key={`${alert.type}-${idx}`}

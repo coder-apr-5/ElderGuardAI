@@ -29,6 +29,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@elder-nest/shared": [
+        "../shared/src/index.ts"
       ]
     }
   },

@@ -1,13 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ElderGuard AI</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElderGuard AI</title>
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      const errorContainer = document.createElement('div');
+      errorContainer.style.position = 'fixed';
+      errorContainer.style.top = '0';
+      errorContainer.style.left = '0';
+      errorContainer.style.width = '100%';
+      errorContainer.style.backgroundColor = '#fee2e2';
+      errorContainer.style.color = '#dc2626';
+      errorContainer.style.padding = '20px';
+      errorContainer.style.zIndex = '9999';
+      errorContainer.style.fontFamily = 'monospace';
+      errorContainer.style.whiteSpace = 'pre-wrap';
+      errorContainer.innerHTML = '<strong>Application Error:</strong><br>' + message + '<br><small>' + source + ':' + lineno + '</small>';
+      document.body.appendChild(errorContainer);
+    };
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

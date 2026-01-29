@@ -4,7 +4,7 @@ import { ArrowLeft, Camera, Save, Plus, Trash2, Heart, Copy, Check } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '@elder-nest/shared';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ElderUser, FamilyMemberManual } from '@elder-nest/shared';
+import type { ElderUser, FamilyMemberManual } from '@elder-nest/shared';
 
 export const ElderProfilePage = () => {
     const navigate = useNavigate();

@@ -4,7 +4,7 @@ import { User, Phone, MapPin, Heart, AlertCircle, Droplet, UserPlus } from "luci
 import { Button } from "@/components/ui/button";
 import { auth, db } from "@elder-nest/shared";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
-import { ElderUser, FamilyUser } from "@elder-nest/shared";
+import type { ElderUser, FamilyUser } from "@elder-nest/shared";
 import { useNavigate } from "react-router-dom";
 
 export const ElderProfileView = () => {

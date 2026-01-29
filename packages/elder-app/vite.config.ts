@@ -10,10 +10,14 @@ export default defineConfig({
   envDir: path.resolve(__dirname, '../../'),
   server: {
     port: 5174,
+    fs: {
+      allow: ['../../'],
+    },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@elder-nest/shared": path.resolve(__dirname, "../shared/src/index.ts"),
     },
   },
 })

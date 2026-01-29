@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
 import { Camera, Save, Plus, Trash2, User } from 'lucide-react';
 import { auth, db } from '@elder-nest/shared';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { FamilyUser, FamilyMemberManual } from '@elder-nest/shared';
+import type { FamilyUser, FamilyMemberManual } from '@elder-nest/shared';
 
 export const MyProfilePage = () => {
     const [loading, setLoading] = useState(true);
