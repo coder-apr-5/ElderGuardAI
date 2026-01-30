@@ -30,6 +30,14 @@ export const EmergencyButton = () => {
                     acknowledged: false,
                     familyIds: familyIds
                 });
+
+                // ALSO update the user document to reflect emergency state in real-time
+                const { updateDoc } = await import("firebase/firestore");
+                const userRef = doc(db, 'users', user.uid);
+                await updateDoc(userRef, {
+                    isEmergency: true,
+                    lastActive: serverTimestamp()
+                });
             }
         } catch (e) {
             console.error("Failed to send SOS", e);

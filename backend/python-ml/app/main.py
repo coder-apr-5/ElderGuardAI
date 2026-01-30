@@ -431,6 +431,36 @@ async def predict_risk(request: RiskAssessmentRequest):
             health_data=user_data.get('health')
         )
         
+        # SAVE TO FIRESTORE (Closing the loop)
+        try:
+            if data_agg.firebase_initialized and data_agg.db:
+                # 1. Add to riskScores history
+                risk_doc = {
+                    'userId': request.userId,
+                    'timestamp': datetime.now(),
+                    'riskScore': prediction.get('risk_score', 0),
+                    'riskLevel': prediction.get('risk_level', 'SAFE'),
+                    'factors': prediction.get('contributing_factors', []),
+                    'metadata': {
+                        'source': 'automated_periodic_check',
+                        'version': '1.0.0'
+                    }
+                }
+                data_agg.db.collection('riskScores').add(risk_doc)
+                
+                # 2. Update User Profile with latest risk for fast access
+                # Also reset emergency if risk is low (optional, but good for auto-recovery)
+                # For now, just update risk stats.
+                user_ref = data_agg.db.collection('users').document(request.userId)
+                user_ref.update({
+                    'currentRiskScore': prediction.get('risk_score', 0),
+                    'currentRiskLevel': prediction.get('risk_level', 'SAFE'),
+                    'lastRiskAnalysis': datetime.now()
+                })
+                logger.info(f"✅ Saved risk score for {request.userId} to Firestore")
+        except Exception as db_err:
+            logger.error(f"Failed to save risk score to DB: {db_err}")
+
         # Log prediction
         logger.info(
             f"Risk prediction: user={request.userId}, "
@@ -541,6 +571,19 @@ async def check_emergency(
                 f"type={emergency.get('emergency_type')}, "
                 f"severity={emergency.get('severity')}"
             )
+
+            # UPDATE USER PROFILE (Real-time sync)
+            try:
+                data_agg = app.state.data_aggregator
+                if data_agg.firebase_initialized and data_agg.db:
+                    user_ref = data_agg.db.collection('users').document(request.userId)
+                    user_ref.update({
+                        'isEmergency': True,
+                        'lastEmergencyTime': datetime.now(),
+                        'emergencyType': emergency.get('emergency_type')
+                    })
+            except Exception as db_err:
+                logger.error(f"Failed to update user emergency status: {db_err}")
         
         return emergency
         
@@ -755,6 +798,20 @@ async def comprehensive_vision(
                 emergency_data=emergency_payload,
                 family_members=[fm for fm in user_data.get('family_members', [])]
             )
+
+            # UPDATE USER PROFILE (Real-time sync to Frontend)
+            try:
+                data_agg = app.state.data_aggregator
+                if data_agg.firebase_initialized and data_agg.db:
+                    user_ref = data_agg.db.collection('users').document(request.userId)
+                    user_ref.update({
+                        'isEmergency': True,
+                        'lastEmergencyTime': timestamp,
+                        'emergencyType': primary_alert['type']
+                    })
+                    logger.info(f"🚨 Set isEmergency=True for {request.userId}")
+            except Exception as db_err:
+                logger.error(f"Failed to update user emergency status: {db_err}")
             
         return response
 

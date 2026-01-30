@@ -10,17 +10,8 @@ export const DashboardPage = () => {
     const { elders: realElders, loading: eldersLoading } = useConnectedElders();
     const [selectedElderId, setSelectedElderId] = useState<string | null>(null);
 
-    // STATIC PRESENTATION DATA
-    const MOCK_ELDER = { uid: 'demo-123', name: 'Martha (Demo)', photo: null };
-    const MOCK_STATUS = {
-        isEmergency: false,
-        riskScore: 35,
-        medicineCompliance: 80,
-        vitals: { stability: 'Stable', heartRate: 72 },
-        mood: 'happy'
-    };
-
-    const elders = realElders.length > 0 ? realElders : [MOCK_ELDER];
+    // 2. Fetch Status for Selected Elder replaces Mocks used previously
+    const elders = realElders;
 
     // Select the first elder by default when list loads
     useEffect(() => {
@@ -48,11 +39,6 @@ export const DashboardPage = () => {
         );
     }
 
-    // If it's the mock elder, use mock status; otherwise use fetched status
-    const actualStatus = (currentElder?.uid === MOCK_ELDER.uid) ? MOCK_STATUS : elderStatus;
-    // If loading status for real elder, show loading; for mock, it's instant
-    const isLoadingData = (currentElder?.uid === MOCK_ELDER.uid) ? false : statusLoading;
-
     return (
         <div className="space-y-6">
             {/* Header / Selector */}
@@ -60,7 +46,7 @@ export const DashboardPage = () => {
                 <h2 className="text-3xl font-bold tracking-tight">
                     Dashboard for <span className="text-indigo-600">{currentElder?.name}</span>
                 </h2>
-                {/* Simple Elder Switcher */}
+                {/* Elder Switcher */}
                 <div className="flex gap-2">
                     {elders.map(elder => (
                         <button
@@ -78,7 +64,7 @@ export const DashboardPage = () => {
             </div>
 
             {/* Emergency Alert Banner */}
-            {actualStatus?.isEmergency && (
+            {elderStatus?.isEmergency && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-pulse">
                     <div className="flex">
                         <div className="flex-shrink-0">
@@ -93,7 +79,7 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Risk Score Card */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -101,10 +87,10 @@ export const DashboardPage = () => {
                         <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        {isLoadingData ? (
+                        {statusLoading ? (
                             <div className="h-24 flex items-center justify-center text-sm text-gray-400">Analyzing...</div>
                         ) : (
-                            <RiskMeter score={actualStatus?.riskScore || 0} />
+                            <RiskMeter score={elderStatus?.riskScore || 0} />
                         )}
                     </CardContent>
                 </Card>
@@ -116,28 +102,14 @@ export const DashboardPage = () => {
                         <Pill className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{actualStatus?.medicineCompliance || 0}%</div>
+                        <div className="text-2xl font-bold">{elderStatus?.medicineCompliance || 0}%</div>
                         <p className="text-xs text-muted-foreground">Today's compliance</p>
                         <div className="mt-4 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-green-500 transition-all duration-1000"
-                                style={{ width: `${actualStatus?.medicineCompliance || 0}%` }}
+                                style={{ width: `${elderStatus?.medicineCompliance || 0}%` }}
                             />
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Vitals Card */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Vitals Status</CardTitle>
-                        <Heart className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{actualStatus?.vitals.stability || 'Unknown'}</div>
-                        <p className="text-xs text-muted-foreground">
-                            Heart Rate: {actualStatus?.vitals.heartRate || '--'} bpm
-                        </p>
                     </CardContent>
                 </Card>
             </div>
@@ -156,14 +128,14 @@ export const DashboardPage = () => {
                         <CardTitle>Mood Trends</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[200px] flex items-center justify-center bg-gray-50 rounded-lg border border-dashed">
-                        {isLoadingData ? (
+                        {statusLoading ? (
                             <span className="text-muted-foreground">Loading trends...</span>
                         ) : (
                             <div className="text-center">
                                 <span className="text-4xl mb-2 block">
-                                    {actualStatus?.mood === 'happy' ? '😊' : actualStatus?.mood === 'sad' ? '😔' : '😐'}
+                                    {elderStatus?.mood === 'happy' ? '😊' : elderStatus?.mood === 'sad' ? '😔' : '😐'}
                                 </span>
-                                <span className="text-muted-foreground">Current Mood: {actualStatus?.mood}</span>
+                                <span className="text-muted-foreground">Current Mood: {elderStatus?.mood}</span>
                             </div>
                         )}
                     </CardContent>

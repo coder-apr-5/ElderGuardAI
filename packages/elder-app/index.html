@@ -8,6 +8,11 @@
   <title>ElderGuard AI</title>
   <script>
     window.onerror = function (message, source, lineno, colno, error) {
+      // Ignore phantom wallet / extension errors
+      if (typeof message === 'string' && (message.includes('ethereum') || message.includes('chrome-extension'))) {
+        return;
+      }
+
       const errorContainer = document.createElement('div');
       errorContainer.style.position = 'fixed';
       errorContainer.style.top = '0';

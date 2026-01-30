@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { FeedbackSection } from '@/components/landing/FeedbackSection';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import {
@@ -506,6 +507,7 @@ const LandingPage = () => {
             <MissionVisionSection />
             <QuoteSection />
             <CTASection />
+            <FeedbackSection />
             <Footer />
         </div>
     );

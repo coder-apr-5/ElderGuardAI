@@ -13,13 +13,11 @@ export interface ElderSummary {
 
 export interface ElderStatus {
     mood: 'happy' | 'okay' | 'sad';
-    heartRate: number;
     riskScore: number;
     lastActive: string;
     isEmergency: boolean;
     medicineCompliance: number;
     vitals: {
-        heartRate: number;
         stability: string;
     };
 }
@@ -117,15 +115,14 @@ export const useElderStatus = (elderId: string | null) => {
                 const { db } = await import("@elder-nest/shared");
                 const { doc, onSnapshot, collection, query, where, orderBy, limit } = await import("firebase/firestore");
 
-                // 1. Listen to User Document (Last Active)
+                // 1. Listen to User Document (Last Active & Emergency Status)
                 const userRef = doc(db, 'users', elderId);
                 unsubscribeUser = onSnapshot(userRef, (docSnap) => {
                     const userData = docSnap.data();
                     setData(prev => ({
                         ...prev!,
                         lastActive: userData?.lastActive?.toDate?.()?.toISOString() || new Date().toISOString(),
-                        // Using a simple check for 'isEmergency' if we add that flag to user text, otherwise default false
-                        isEmergency: false,
+                        isEmergency: userData?.isEmergency || false, // REAL TIME emergency status
                     } as ElderStatus));
                 });
 
@@ -169,15 +166,15 @@ export const useElderStatus = (elderId: string | null) => {
                             riskScore: riskData.riskScore || 0,
                             vitals: {
                                 ...prev?.vitals,
-                                stability: riskData.riskLevel || 'Stable' // Map level to stability text
+                                stability: riskData.riskLevel || 'Stable'
                             }
                         } as ElderStatus));
                     } else {
                         // Default if no risk score yet
                         setData(prev => ({
                             ...prev!,
-                            riskScore: 15,
-                            vitals: { heartRate: 72, stability: 'Stable' }
+                            riskScore: 0,
+                            vitals: { stability: 'Stable' }
                         } as ElderStatus));
                     }
                 });
@@ -185,12 +182,11 @@ export const useElderStatus = (elderId: string | null) => {
                 // Initialize default structure while waiting for snapshots
                 setData({
                     mood: 'okay',
-                    heartRate: 75,
                     riskScore: 0,
                     lastActive: new Date().toISOString(),
                     isEmergency: false,
-                    medicineCompliance: 100,
-                    vitals: { heartRate: 75, stability: 'Stable' }
+                    medicineCompliance: 100, // Still placeholder until we have medicine tracking
+                    vitals: { stability: 'Stable' }
                 });
 
             } catch (err) {
@@ -215,3 +211,4 @@ export const useElderStatus = (elderId: string | null) => {
 
     return { data, loading, error, refresh };
 };
+

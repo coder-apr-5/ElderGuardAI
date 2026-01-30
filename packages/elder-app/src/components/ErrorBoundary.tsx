@@ -18,6 +18,10 @@ class ErrorBoundary extends Component<Props, State> {
     };
 
     public static getDerivedStateFromError(error: Error): State {
+        // Ignore extension-related errors
+        if (error.message.includes('ethereum') || error.message.includes('chrome-extension') || error.stack?.includes('chrome-extension')) {
+            return { hasError: false, error: null, errorInfo: null };
+        }
         // Update state so the next render will show the fallback UI.
         return { hasError: true, error, errorInfo: null };
     }

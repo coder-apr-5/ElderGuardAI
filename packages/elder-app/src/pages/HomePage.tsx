@@ -14,7 +14,8 @@ import {
   Stethoscope,
   Heart,
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  User
 } from "lucide-react";
 import { CameraMonitor } from "@/features/camera";
 import { RealTimeClock, ClockWidget } from "@/components/ClockWidget";
@@ -181,56 +182,68 @@ export const HomePage = () => {
             >
               <LogOut size={24} />
             </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/profile')}
+              className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-slate-700 overflow-hidden shadow-lg border-2 border-white dark:border-slate-600 flex items-center justify-center"
+              aria-label="Profile"
+            >
+              <User size={24} className="text-indigo-500 dark:text-indigo-300" />
+            </motion.button>
           </div>
         </div>
 
         {/* ===== FAMILY CONNECTION CODE BAR ===== */}
-        {connectionCode && showBanner && (
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-inner relative">
-            <div className="max-w-7xl mx-auto px-6 py-3 flex flex-wrap gap-4 justify-between items-center pr-12">
-              <div className="flex items-center gap-2">
-                <Heart className="text-white/80" size={20} fill="currentColor" />
-                <p className="font-medium text-lg">
-                  Family Code:
-                  <span className="ml-3 font-mono font-bold text-xl tracking-widest bg-white/20 px-3 py-0.5 rounded-lg">
-                    {connectionCode}
-                  </span>
-                </p>
+        {
+          connectionCode && showBanner && (
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-inner relative">
+              <div className="max-w-7xl mx-auto px-6 py-3 flex flex-wrap gap-4 justify-between items-center pr-12">
+                <div className="flex items-center gap-2">
+                  <Heart className="text-white/80" size={20} fill="currentColor" />
+                  <p className="font-medium text-lg">
+                    Family Code:
+                    <span className="ml-3 font-mono font-bold text-xl tracking-widest bg-white/20 px-3 py-0.5 rounded-lg">
+                      {connectionCode}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  onClick={shareCode}
+                  className="px-5 py-2 rounded-full bg-white text-emerald-700 hover:bg-emerald-50 font-bold text-sm shadow-sm transition-colors"
+                >
+                  Share Code
+                </button>
               </div>
               <button
-                onClick={shareCode}
-                className="px-5 py-2 rounded-full bg-white text-emerald-700 hover:bg-emerald-50 font-bold text-sm shadow-sm transition-colors"
+                onClick={() => setShowBanner(false)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-full transition-colors"
+                aria-label="Close Banner"
               >
-                Share Code
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
-            <button
-              onClick={() => setShowBanner(false)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-full transition-colors"
-              aria-label="Close Banner"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        )}
-      </header>
+          )
+        }
+      </header >
 
       {/* ================= MAIN ================= */}
-      <motion.main
+      < motion.main
         className="max-w-7xl mx-auto px-6 py-8 space-y-10"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         {/* TOP ROW: HERO + OVERVIEW + SIDEBAR */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        < div className="grid grid-cols-1 lg:grid-cols-3 gap-8" >
           {/* -------- LEFT (PRIMARY) -------- */}
-          <section className="lg:col-span-2 space-y-8">
+          < section className="lg:col-span-2 space-y-8" >
             {/* HERO */}
-            <motion.div variants={itemVariants}>
+            < motion.div variants={itemVariants} >
               <Link to="/chat">
                 <motion.div
                   whileHover={{ scale: 1.02, y: -5 }}
@@ -259,7 +272,7 @@ export const HomePage = () => {
                   </div>
                 </motion.div>
               </Link>
-            </motion.div>
+            </motion.div >
 
             {/* CAMERA MONITORING PART (REAL-TIME) */}
             <motion.div variants={itemVariants}>
@@ -267,9 +280,9 @@ export const HomePage = () => {
             </motion.div>
 
             {/* OVERVIEW CARDS */}
-            <div className="grid sm:grid-cols-2 gap-6">
+            < div className="grid sm:grid-cols-2 gap-6" >
               {/* Dynamic Clock */}
-              <motion.div
+              < motion.div
                 variants={itemVariants}
                 whileHover={{ y: -5 }}
                 className="rounded-3xl p-6 bg-slate-900 border border-slate-700 shadow-lg relative overflow-hidden text-white"
@@ -281,7 +294,7 @@ export const HomePage = () => {
                   <p className="text-slate-400 font-semibold mb-1">Current Time</p>
                   <RealTimeClock />
                 </div>
-              </motion.div>
+              </motion.div >
 
               <motion.div
                 variants={itemVariants}
@@ -299,13 +312,13 @@ export const HomePage = () => {
                   </div>
                 </div>
               </motion.div>
-            </div>
-          </section>
+            </div >
+          </section >
 
           {/* -------- RIGHT (SIDE ACTIONS & GRAPHS) -------- */}
-          <aside className="space-y-6">
+          < aside className="space-y-6" >
             {/* MOOD GRAPH (Replaces Phone/Stethoscope somewhat or reshuffled) */}
-            <motion.div
+            < motion.div
               variants={itemVariants}
               className="rounded-3xl p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg h-[200px] flex flex-col justify-between"
             >
@@ -332,7 +345,7 @@ export const HomePage = () => {
                   </div>
                 ))}
               </div>
-            </motion.div>
+            </motion.div >
 
             <motion.a
               href={emergencyContact ? `tel:${emergencyContact}` : undefined}
@@ -370,11 +383,11 @@ export const HomePage = () => {
                 </div>
               </div>
             </motion.div>
-          </aside>
-        </div>
+          </aside >
+        </div >
 
         {/* FULL WIDTH SECTION: MOOD */}
-        <motion.div
+        < motion.div
           variants={itemVariants}
           className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 relative overflow-hidden w-full"
         >
@@ -385,10 +398,10 @@ export const HomePage = () => {
           <div className="relative z-10">
             <MoodSelector />
           </div>
-        </motion.div>
+        </motion.div >
 
         {/* FULL WIDTH SECTION: MEDICINE */}
-        <motion.div
+        < motion.div
           variants={itemVariants}
           className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 w-full"
         >
@@ -396,11 +409,11 @@ export const HomePage = () => {
             Today’s Medicine
           </h3>
           <MedicineList />
-        </motion.div>
-      </motion.main>
+        </motion.div >
+      </motion.main >
 
       {/* ================= EMERGENCY ================= */}
-      <motion.div
+      < motion.div
         className="fixed bottom-6 left-0 right-0 px-6 flex justify-center z-50 pointer-events-none"
         initial={{ y: 200, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -410,7 +423,7 @@ export const HomePage = () => {
           <div className="absolute inset-0 bg-red-500 blur-2xl opacity-20 rounded-full translate-y-4" />
           <EmergencyButton />
         </div>
-      </motion.div>
-    </div>
+      </motion.div >
+    </div >
   );
 };
