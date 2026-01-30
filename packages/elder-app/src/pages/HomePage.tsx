@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EmergencyButton } from "@/features/emergency/EmergencyButton";
-import { MoodSelector } from "@/features/mood/MoodSelector";
+
 import { MedicineList } from "@/features/medicine/MedicineList";
 import { motion } from "framer-motion";
 import {
@@ -49,6 +49,7 @@ export const HomePage = () => {
   const [userName, setUserName] = useState("Friend");
   const [connectionCode, setConnectionCode] = useState<string | null>(null);
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]); // Using any for simplicity or import type
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -65,6 +66,7 @@ export const HomePage = () => {
           const data = snap.data();
           setConnectionCode(data.connectionCode);
           setEmergencyContact(data.emergencyContact);
+          setFamilyMembers(data.manualFamilyMembers || []);
         }
       } catch (e) {
         console.error(e);
@@ -111,6 +113,10 @@ export const HomePage = () => {
       }
     }
   };
+
+  // Filter Doctors from family members (assuming relation='Doctor')
+  const doctors = familyMembers.filter(m => m.relation?.toLowerCase().includes('doctor') || m.relation?.toLowerCase().includes('dr'));
+  const familyOnly = familyMembers.filter(m => !m.relation?.toLowerCase().includes('doctor') && !m.relation?.toLowerCase().includes('dr'));
 
   return (
     <div
@@ -313,57 +319,108 @@ export const HomePage = () => {
                 </div>
               </motion.div>
             </div >
+
+            {/* FULL WIDTH SECTION: MEDICINE */}
+            < motion.div
+              variants={itemVariants}
+              className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 w-full"
+            >
+              <h3 className={`font-bold text-slate-800 dark:text-white mb-8 ${cardTitle}`}>
+                Today’s Medicine
+              </h3>
+              <MedicineList />
+            </motion.div >
+
+            {/* FULL WIDTH SECTION: CALL DOCTOR */}
+            <motion.div
+              variants={itemVariants}
+              className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 w-full"
+            >
+              <h3 className={`font-bold text-slate-800 dark:text-white mb-8 ${cardTitle} flex items-center gap-3`}>
+                <Stethoscope className="text-blue-500" size={32} />
+                Call Doctor
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {doctors.length > 0 ? (
+                  doctors.map((doc, i) => (
+                    <motion.a
+                      key={i}
+                      href={`tel:${doc.phone}`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center gap-4 p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 text-left transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center shrink-0">
+                        {doc.photoURL ? (
+                          <img src={doc.photoURL} alt={doc.name} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <Stethoscope size={20} className="text-blue-600 dark:text-blue-300" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-lg text-slate-800 dark:text-white">{doc.name}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{doc.phone}</p>
+                      </div>
+                    </motion.a>
+                  ))
+                ) : (
+                  <div className="col-span-1 sm:col-span-2 p-6 text-center text-slate-400 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                    No doctors added in profile yet.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
           </section >
 
           {/* -------- RIGHT (SIDE ACTIONS & GRAPHS) -------- */}
           < aside className="space-y-6" >
-            {/* MOOD GRAPH (Replaces Phone/Stethoscope somewhat or reshuffled) */}
-            < motion.div
-              variants={itemVariants}
-              className="rounded-3xl p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg h-[200px] flex flex-col justify-between"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200">Mood Trends</h3>
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg text-purple-600 dark:text-purple-300">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18" /><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" /></svg>
-                </div>
-              </div>
-              {/* Simple CSS Bar Graph Simulation */}
-              <div className="flex items-end justify-between gap-2 h-full pb-2">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2 group w-full">
-                    <div
-                      className="w-full bg-slate-100 dark:bg-slate-700 rounded-t-lg relative overflow-hidden"
-                      style={{ height: '100px' }}
-                    >
-                      <div
-                        className="absolute bottom-0 w-full bg-purple-500 rounded-t-lg transition-all duration-1000 group-hover:bg-purple-400"
-                        style={{ height: `${[40, 60, 30, 80, 50, 90, 70][i]}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold text-slate-400">{day}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div >
+            {/* CALL FAMILY SECTION (Moved to Sidebar Top for importance) */}
+            <div className="rounded-3xl p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                <Heart size={20} className="text-rose-500" fill="currentColor" />
+                Call Family
+              </h3>
 
-            <motion.a
-              href={emergencyContact ? `tel:${emergencyContact}` : undefined}
-              variants={itemVariants}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              className="block rounded-3xl p-6 bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-xl shadow-indigo-200 dark:shadow-none relative overflow-hidden group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                  <Phone size={24} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold">Call Family</h3>
-                  <p className="text-indigo-100 text-sm">One-tap connect</p>
-                </div>
+              <div className="space-y-3">
+                {emergencyContact && (
+                  <motion.a
+                    href={`tel:${emergencyContact}`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold"
+                  >
+                    <div className="p-2 bg-rose-200 dark:bg-rose-800 rounded-full">
+                      <Phone size={16} />
+                    </div>
+                    Emergency
+                  </motion.a>
+                )}
+
+                {familyOnly.map((member, i) => (
+                  <motion.a
+                    key={i}
+                    href={`tel:${member.phone}`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 text-slate-700 dark:text-slate-200"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden shrink-0">
+                      {member.photoURL ? <img src={member.photoURL} alt={member.name} className="w-full h-full object-cover" /> : <User size={20} className="m-2" />}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="font-bold text-sm truncate">{member.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{member.relation}</p>
+                    </div>
+                  </motion.a>
+                ))}
+
+                {familyOnly.length === 0 && !emergencyContact && (
+                  <p className="text-sm text-slate-400 text-center py-4">No contacts added.</p>
+                )}
               </div>
-            </motion.a>
+            </div>
 
             <motion.div
               variants={itemVariants}
@@ -386,30 +443,6 @@ export const HomePage = () => {
           </aside >
         </div >
 
-        {/* FULL WIDTH SECTION: MOOD */}
-        < motion.div
-          variants={itemVariants}
-          className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 relative overflow-hidden w-full"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-100 dark:bg-slate-700 rounded-full blur-3xl -mr-20 -mt-20 opacity-50" />
-          <h3 className={`font-bold text-slate-800 dark:text-white mb-8 relative z-10 ${cardTitle}`}>
-            How are you feeling today?
-          </h3>
-          <div className="relative z-10">
-            <MoodSelector />
-          </div>
-        </motion.div >
-
-        {/* FULL WIDTH SECTION: MEDICINE */}
-        < motion.div
-          variants={itemVariants}
-          className="rounded-[2rem] p-10 bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 w-full"
-        >
-          <h3 className={`font-bold text-slate-800 dark:text-white mb-8 ${cardTitle}`}>
-            Today’s Medicine
-          </h3>
-          <MedicineList />
-        </motion.div >
       </motion.main >
 
       {/* ================= EMERGENCY ================= */}

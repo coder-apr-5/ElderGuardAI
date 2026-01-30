@@ -131,11 +131,30 @@ export const DashboardPage = () => {
                         {statusLoading ? (
                             <span className="text-muted-foreground">Loading trends...</span>
                         ) : (
-                            <div className="text-center">
-                                <span className="text-4xl mb-2 block">
-                                    {elderStatus?.mood === 'happy' ? '😊' : elderStatus?.mood === 'sad' ? '😔' : '😐'}
-                                </span>
-                                <span className="text-muted-foreground">Current Mood: {elderStatus?.mood}</span>
+                            <div className="w-full h-full flex flex-col justify-between">
+                                <div className="text-center mb-2">
+                                    <span className="text-4xl mb-1 block">
+                                        {elderStatus?.mood === 'happy' ? '😊' : elderStatus?.mood === 'sad' ? '😔' : elderStatus?.mood === 'okay' ? '�' : '😐'}
+                                    </span>
+                                    <span className="text-sm font-medium text-slate-600">Current: <span className="capitalize">{elderStatus?.mood || 'Neutral'}</span></span>
+                                </div>
+                                {/* Simple CSS Bar Graph Simulation */}
+                                <div className="flex items-end justify-between gap-2 h-24 pb-2 px-2">
+                                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-1 group w-full">
+                                            <div
+                                                className="w-full bg-slate-100 rounded-t relative overflow-hidden"
+                                                style={{ height: '80px' }}
+                                            >
+                                                <div
+                                                    className="absolute bottom-0 w-full bg-indigo-500 rounded-t transition-all duration-1000 group-hover:bg-indigo-400"
+                                                    style={{ height: `${[40, 60, 30, 80, 50, 90, 70][i]}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400">{day}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </CardContent>
