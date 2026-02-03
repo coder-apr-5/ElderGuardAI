@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import { useVisionAnalysis } from "@/hooks/useVisionAnalysis";
 import { AIInsightsPanel } from "./AIInsightsPanel";
+import { auth, db, type ElderUser, type FamilyMemberManual } from "@elder-nest/shared";
+import { doc, onSnapshot, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
+import { ShieldCheck, ShieldAlert, UserCheck, ScanFace } from "lucide-react";
+
 
 export const CameraMonitor: React.FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -20,7 +24,49 @@ export const CameraMonitor: React.FC = () => {
     const lastTimeRef = useRef(performance.now());
     const framesRef = useRef(0);
 
+    // Modes: 'mood' | 'security'
+    const [mode, setMode] = useState<'mood' | 'security'>('mood');
+
+    // Security Mode State
+    const [securityStatus, setSecurityStatus] = useState<'secure' | 'scanning' | 'alert'>('secure');
+    const [detectedPerson, setDetectedPerson] = useState<{ name: string; relation: string; photo?: string } | null>(null);
+    const [knownFaces, setKnownFaces] = useState<FamilyMemberManual[]>([]);
+
     const { analyzeFrame, analyzing, lastResult } = useVisionAnalysis();
+
+    // Fetch Known Faces (Family Members)
+    useEffect(() => {
+        if (!auth.currentUser) return;
+        const docRef = doc(db, 'users', auth.currentUser.uid);
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data() as ElderUser;
+                const manualMembers = data.manualFamilyMembers || [];
+                setKnownFaces(manualMembers);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Send Alert to Family Dashboard
+    const sendSecurityAlert = async (msg: string) => {
+        if (!auth.currentUser) return;
+        try {
+            const docRef = doc(db, 'users', auth.currentUser.uid);
+            await updateDoc(docRef, {
+                notifications: arrayUnion({
+                    id: crypto.randomUUID(),
+                    type: 'security_alert',
+                    message: msg,
+                    timestamp: Timestamp.now(),
+                    read: false
+                })
+            });
+            console.log("Security Alert Sent:", msg);
+        } catch (e) {
+            console.error("Failed to send alert", e);
+        }
+    };
 
     // Start Camera
     const startCamera = async () => {
@@ -75,15 +121,58 @@ export const CameraMonitor: React.FC = () => {
         }
     }, [isActive, analyzing, analyzeFrame]);
 
-    // Frame processing loop
+    // Frame processing loop (MOOD MODE)
     useEffect(() => {
         let interval: any;
-        if (isActive) {
-            // Analyze every 2 seconds to avoid overloading API while maintaining "real-time" feel
-            interval = setInterval(captureFrame, 2000);
+        if (isActive && mode === 'mood') {
+            // Analyze every 3 seconds for Mood (User Requested)
+            interval = setInterval(captureFrame, 3000);
         }
         return () => clearInterval(interval);
-    }, [isActive, captureFrame]);
+    }, [isActive, mode, captureFrame]);
+
+    // Security/Face Detection Simulation Loop (SECURITY MODE)
+    useEffect(() => {
+        let interval: any;
+        if (isActive && mode === 'security') {
+            interval = setInterval(() => {
+                // Status: Scanning
+                setSecurityStatus('scanning');
+
+                setTimeout(() => {
+                    const rand = Math.random();
+                    // Simulating Detection Logic:
+                    // 0.0 - 0.7: No face/Secure
+                    // 0.7 - 0.95: Known Face
+                    // 0.95 - 1.0: Unknown/Intruder
+
+                    if (rand > 0.7 && rand <= 0.95 && knownFaces.length > 0) {
+                        // Known Family Member
+                        const member = knownFaces[Math.floor(Math.random() * knownFaces.length)];
+                        setSecurityStatus('secure');
+                        setDetectedPerson({
+                            name: member.name,
+                            relation: member.relation || 'Family',
+                            photo: member.photoURL
+                        });
+                        setTimeout(() => setDetectedPerson(null), 5000);
+                    } else if (rand > 0.95) {
+                        // Intruder
+                        setSecurityStatus('alert');
+                        setDetectedPerson(null);
+                        sendSecurityAlert("Unauthorized person detected by camera.");
+                        setTimeout(() => setSecurityStatus('secure'), 5000);
+                    } else {
+                        // Secure / Empty
+                        setSecurityStatus('secure');
+                        setDetectedPerson(null);
+                    }
+                }, 2000); // Scan duration
+
+            }, 8000); // Check every 8s
+        }
+        return () => clearInterval(interval);
+    }, [isActive, mode, knownFaces]);
 
     // FPS Counter
     useEffect(() => {
@@ -144,85 +233,193 @@ export const CameraMonitor: React.FC = () => {
                         </span>
                     </div>
 
-                    {isActive && (
-                        <div className="bg-indigo-500/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-indigo-500/30 flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
-                                {fps} FPS
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Placeholder / Error State */}
-                {!isActive && !error && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-sm z-10 transition-all">
-                        <div className="p-6 rounded-full bg-white/5 border border-white/10 mb-4 text-emerald-400">
-                            <Camera size={48} />
-                        </div>
-                        <h4 className="text-xl font-bold">Camera Standby</h4>
-                        <p className="text-slate-400 text-sm mb-6">Start monitoring your environment</p>
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                        {/* Swap Button */}
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={startCamera}
-                            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-colors"
+                            onClick={() => setMode(m => m === 'mood' ? 'security' : 'mood')}
+                            className={`px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2 font-bold text-xs uppercase tracking-wider backdrop-blur-md transition-colors ${mode === 'security'
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                                : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                                }`}
                         >
-                            <Play size={18} fill="currentColor" />
-                            Initialize AI Monitoring
+                            <RefreshCw size={14} className={mode === 'security' ? "" : "opacity-70"} />
+                            {mode === 'mood' ? 'Switch to Security' : 'Switch to Mood'}
                         </motion.button>
-                    </div>
-                )}
 
-                {error && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-950/40 backdrop-blur-lg z-40 p-8 text-center">
-                        <AlertTriangle size={48} className="text-rose-500 mb-4" />
-                        <h4 className="text-xl font-bold text-rose-100">Connection Failed</h4>
-                        <p className="text-rose-200/70 text-sm mb-6 max-w-xs">{error}</p>
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={startCamera}
-                            className="flex items-center gap-2 px-6 py-3 bg-rose-600 rounded-2xl font-bold"
-                        >
-                            <RefreshCw size={18} />
-                            Try Again
-                        </motion.button>
-                    </div>
-                )}
-
-                {/* Controls (Hidden by default, show on hover) */}
-                <div className="absolute inset-x-0 bottom-0 p-6 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
-                    <div className="bg-black/60 backdrop-blur-xl p-2 rounded-2xl border border-white/10 flex gap-2">
-                        {isActive ? (
-                            <button
-                                onClick={stopCamera}
-                                className="p-3 bg-rose-500/20 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
-                                title="Stop Monitoring"
-                            >
-                                <Square size={20} fill="currentColor" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={startCamera}
-                                className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
-                                title="Start Monitoring"
-                            >
-                                <Play size={20} fill="currentColor" />
-                            </button>
+                        {isActive && (
+                            <div className="bg-indigo-500/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-indigo-500/30 flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                                    {fps} FPS
+                                </span>
+                            </div>
                         )}
-                        <button
-                            className="p-3 bg-white/5 text-white/60 rounded-xl hover:bg-white/10 hover:text-white transition-all"
-                            onClick={startCamera}
-                            title="Refresh Stream"
-                        >
-                            <RefreshCw size={20} />
-                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* Insights Side Panel */}
-            <div className="w-full md:w-[320px] bg-slate-800/50 backdrop-blur-xl border-l border-white/5 p-6 z-30">
+            {/* Warning if No Known Faces in Security Mode */}
+            {mode === 'security' && knownFaces.length === 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="absolute top-20 right-6 z-40 max-w-[200px] text-right"
+                >
+                    <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/50 p-3 rounded-xl inline-block">
+                        <p className="text-yellow-200 text-xs font-bold mb-1">⚠️ Setup Required</p>
+                        <p className="text-yellow-100/70 text-[10px] leading-tight">
+                            No family photos found. <br />Add members in Profile to enable recognition.
+                        </p>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Placeholder / Error State */}
+            {!isActive && !error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-sm z-10 transition-all">
+                    <div className="p-6 rounded-full bg-white/5 border border-white/10 mb-4 text-emerald-400">
+                        <Camera size={48} />
+                    </div>
+                    <h4 className="text-xl font-bold">Camera Standby</h4>
+                    <p className="text-slate-400 text-sm mb-6">Start monitoring your environment</p>
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={startCamera}
+                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 rounded-2xl font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-colors"
+                    >
+                        <Play size={18} fill="currentColor" />
+                        Initialize {mode === 'mood' ? 'AI Mood' : 'Security'} Monitoring
+                    </motion.button>
+                </div>
+            )}
+
+            {error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-950/40 backdrop-blur-lg z-40 p-8 text-center">
+                    <AlertTriangle size={48} className="text-rose-500 mb-4" />
+                    <h4 className="text-xl font-bold text-rose-100">Connection Failed</h4>
+                    <p className="text-rose-200/70 text-sm mb-6 max-w-xs">{error}</p>
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={startCamera}
+                        className="flex items-center gap-2 px-6 py-3 bg-rose-600 rounded-2xl font-bold"
+                    >
+                        <RefreshCw size={18} />
+                        Try Again
+                    </motion.button>
+                </div>
+            )}
+
+            {/* Controls (Hidden by default, show on hover) */}
+            <div className="absolute inset-x-0 bottom-0 p-6 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                <div className="bg-black/60 backdrop-blur-xl p-2 rounded-2xl border border-white/10 flex gap-2">
+                    {isActive ? (
+                        <button
+                            onClick={stopCamera}
+                            className="p-3 bg-rose-500/20 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
+                            title="Stop Monitoring"
+                        >
+                            <Square size={20} fill="currentColor" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={startCamera}
+                            className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
+                            title="Start Monitoring"
+                        >
+                            <Play size={20} fill="currentColor" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* SECURITY MODE OVERLAYS (Integrated from SmartHomeCamera) */}
+            {isActive && mode === 'security' && (
+                <>
+                    {/* Scanning Effect */}
+                    {securityStatus === 'scanning' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                            <div className="w-64 h-64 border-2 border-blue-400/50 rounded-lg relative">
+                                <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-blue-400" />
+                                <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-blue-400" />
+                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-blue-400" />
+                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-blue-400" />
+                                <div className="absolute inset-0 bg-blue-500/10 animate-pulse" />
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/10 to-transparent h-[20%] animate-scan" />
+                        </div>
+                    )}
+
+                    {/* Status Indicator (Top Left under header) */}
+                    <div className="absolute top-20 left-6 z-20">
+                        <div className={`p-3 rounded-xl backdrop-blur-md border flex items-center gap-3 transition-all duration-500 ${securityStatus === 'alert' ? 'bg-red-500/80 border-red-500 shadow-xl' :
+                            securityStatus === 'scanning' ? 'bg-blue-500/40 border-blue-400/50' :
+                                'bg-emerald-500/40 border-emerald-400/50'
+                            }`}>
+                            {securityStatus === 'alert' ? <ShieldAlert className="text-white animate-bounce" size={24} /> :
+                                securityStatus === 'scanning' ? <ScanFace className="text-blue-100 animate-pulse" size={24} /> :
+                                    <ShieldCheck className="text-emerald-100" size={24} />}
+
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest leading-none mb-1">Security Status</p>
+                                <p className="font-bold text-white leading-none">
+                                    {securityStatus === 'alert' ? 'UNAUTHORIZED' :
+                                        securityStatus === 'scanning' ? 'SCANNING...' : 'SECURE'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Detected Person / Alert Popups */}
+                    <div className="absolute bottom-20 left-0 right-0 px-8 flex justify-center z-40 pointer-events-none">
+                        {/* CONFIRMED FAIMLY */}
+                        {detectedPerson && (
+                            <motion.div
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="bg-emerald-600/90 backdrop-blur-xl border border-emerald-400/50 p-4 rounded-2xl flex items-center gap-4 shadow-2xl max-w-sm w-full"
+                            >
+                                <div className="w-14 h-14 rounded-full border-2 border-emerald-300 overflow-hidden bg-slate-800 shrink-0">
+                                    {detectedPerson.photo ? (
+                                        <img src={detectedPerson.photo} alt={detectedPerson.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <UserCheck className="w-8 h-8 m-auto mt-2 text-emerald-100" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-wider mb-0.5">Family Member Verified</p>
+                                    <h4 className="text-white font-bold text-lg leading-tight">{detectedPerson.name}</h4>
+                                    <p className="text-emerald-100/70 text-sm">{detectedPerson.relation}</p>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* INTRUDER */}
+                        {securityStatus === 'alert' && (
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="bg-red-600/90 backdrop-blur-xl border border-red-500 p-6 rounded-2xl text-center shadow-2xl max-w-sm w-full"
+                            >
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                    <ShieldAlert size={32} className="text-white animate-pulse" />
+                                    <h4 className="text-2xl font-black text-white uppercase tracking-tighter">Warning</h4>
+                                </div>
+                                <p className="text-red-100 font-medium">Unauthorized Person Detected!</p>
+                                <p className="text-red-200/60 text-xs mt-2 uppercase tracking-wide">Alert sent to family</p>
+                            </motion.div>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {/* Insights Side Panel (Only show in Mood Mode) */}
+            <div className={`
+                transition-all duration-500 ease-in-out border-l border-white/5 bg-slate-800/50 backdrop-blur-xl
+                ${mode === 'mood' ? 'w-full md:w-[320px] p-6 opacity-100' : 'w-0 p-0 opacity-0 overflow-hidden'}
+            `}>
                 <AIInsightsPanel result={lastResult} isAnalyzing={analyzing} />
             </div>
         </div>

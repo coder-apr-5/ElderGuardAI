@@ -1,36 +1,105 @@
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, ShieldAlert, Bell } from "lucide-react";
+import { useConnectedElders } from "@/hooks/useElderData";
+import { db } from "@elder-nest/shared";
+import { doc, onSnapshot } from "firebase/firestore";
+
+interface Notification {
+    id: string;
+    type: string;
+    message: string;
+    timestamp: any; // Firestore Timestamp
+    read: boolean;
+    elderName?: string; // Enhanced with elder name
+}
 
 export const AlertsPage = () => {
+    const { elders, loading } = useConnectedElders();
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+
+    useEffect(() => {
+        if (elders.length === 0) return;
+
+        const unsubscribes: (() => void)[] = [];
+
+        elders.forEach(elder => {
+            const docRef = doc(db, 'users', elder.uid);
+            const unsub = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const notifs = (data.notifications || []) as Notification[];
+
+                    // Add elder name and update state
+                    const enhancedNotifs = notifs.map(n => ({
+                        ...n,
+                        elderName: elder.name
+                    }));
+
+                    setNotifications(prev => {
+                        // Remove old notifs from this elder
+                        const others = prev.filter(n => n.elderName !== elder.name);
+                        // Combine and sort by timestamp desc
+                        return [...others, ...enhancedNotifs].sort((a, b) =>
+                            (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)
+                        );
+                    });
+                }
+            });
+            unsubscribes.push(unsub);
+        });
+
+        return () => {
+            unsubscribes.forEach(unsub => unsub());
+        };
+    }, [elders]);
+
+    if (loading) return <div>Loading alerts...</div>;
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold tracking-tight">Alerts & Notifications</h1>
-            <div className="grid gap-4">
-                <Card className="border-l-4 border-l-yellow-500">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <AlertTriangle className="text-yellow-500" size={20} />
-                            Missed Medication
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-gray-600">Morning blood pressure medication not taken by 9:00 AM.</p>
-                        <p className="text-sm text-gray-400 mt-2">2 hours ago</p>
-                    </CardContent>
-                </Card>
-                <Card className="border-l-4 border-l-green-500">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <CheckCircle className="text-green-500" size={20} />
-                            Check-in Completed
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-gray-600">Daily mood check-in completed successfully.</p>
-                        <p className="text-sm text-gray-400 mt-2">5 hours ago</p>
-                    </CardContent>
-                </Card>
-            </div>
+
+            {notifications.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50 rounded-lg">
+                    <Bell className="mx-auto h-12 w-12 text-gray-300" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No new notifications</h3>
+                    <p className="mt-1 text-sm text-gray-500">You're all caught up!</p>
+                </div>
+            ) : (
+                <div className="grid gap-4">
+                    {notifications.map((notif) => (
+                        <Card
+                            key={notif.id || Math.random()}
+                            className={`border-l-4 ${notif.type === 'security_alert' ? 'border-l-red-600 bg-red-50/50' :
+                                    notif.type === 'emergency' ? 'border-l-red-500' :
+                                        notif.type === 'missed_meds' ? 'border-l-yellow-500' :
+                                            'border-l-blue-500'
+                                }`}
+                        >
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    {notif.type === 'security_alert' ? <ShieldAlert className="text-red-600 animate-pulse" size={20} /> :
+                                        notif.type === 'emergency' ? <AlertTriangle className="text-red-500" size={20} /> :
+                                            notif.type === 'missed_meds' ? <AlertTriangle className="text-yellow-500" size={20} /> :
+                                                <CheckCircle className="text-blue-500" size={20} />}
+
+                                    {notif.type === 'security_alert' ? 'Security Alert' :
+                                        notif.type === 'emergency' ? 'Emergency Alert' :
+                                            'System Notification'}
+
+                                    <span className="text-xs font-normal text-gray-400 ml-auto">
+                                        {notif.elderName} • {notif.timestamp?.toDate ? notif.timestamp.toDate().toLocaleString() : 'Just now'}
+                                    </span>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-gray-800 font-medium">{notif.message}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
