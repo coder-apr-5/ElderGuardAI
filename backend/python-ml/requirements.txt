@@ -21,7 +21,7 @@ opencv-python-headless==4.9.0.80
 mediapipe==0.10.14
 
 # Image Processing
-pillow==10.2.0
+pillow==10.3.0
 python-multipart==0.0.6
 
 # Firebase (Firestore + FCM)
