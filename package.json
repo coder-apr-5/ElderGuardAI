@@ -10,8 +10,9 @@
         "dev:admin": "npm run dev --workspace=admin-portal",
         "dev:api": "npm run dev --prefix backend/node-api",
         "dev:chat": "npm run dev --prefix backend/ai-chat-service",
-        "dev:ml": "cd backend/python-ml && uvicorn app.main:app --reload --port 8000",
-        "dev": "concurrently -n \"ELDER,API,CHAT\" -c \"bgGreen.bold,bgBlue.bold,bgMagenta.bold\" \"npm run dev:elder\" \"npm run dev:api\" \"npm run dev:chat\"",
+        "dev:auth": "npm run dev --prefix backend/auth-service",
+        "dev:ml": "cd backend/python-ml && python -m uvicorn app.main:app --reload --port 8000",
+        "dev": "concurrently -n \"ELDER,API,CHAT,AUTH,ML\" -c \"bgGreen.bold,bgBlue.bold,bgMagenta.bold,bgCyan.bold,bgYellow.bold\" \"npm run dev:elder\" \"npm run dev:api\" \"npm run dev:chat\" \"npm run dev:auth\" \"npm run dev:ml\"",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {

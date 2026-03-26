@@ -39,7 +39,7 @@ const initializeFirebase = (): admin.app.App => {
       projectId && 
       clientEmail && 
       privateKey && 
-      !isPlaceholder(projectId) &&
+      !projectId.includes('your-') &&
       !isPlaceholder(privateKey) &&
       privateKey.includes('-----BEGIN PRIVATE KEY-----') &&
       privateKey.length > 200;

@@ -24,7 +24,9 @@ export function initializeFirebase(): admin.app.App {
     const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 
     // Check if we are using mock credentials
-    if (!projectId || !privateKey || !clientEmail || privateKey.includes('MOCK') || isDev) {
+    const isMock = !projectId || !privateKey || !clientEmail || privateKey.includes('your-') || privateKey.includes('placeholder');
+    
+    if (isMock) {
         if (!isDev) {
             logger.warn('Missing or mock Firebase credentials in non-development environment');
         } else {
