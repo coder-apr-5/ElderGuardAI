@@ -54,7 +54,7 @@ const Header = ({ scrolled }: { scrolled: boolean }) => {
                     {navLinks.map((link) => (
                         <a
                             key={link}
-                            href={`#${link.toLowerCase().replace(' ', '-')}`}
+                            href={`#${link.toLowerCase().replace(/ /g, '-')}`}
                             className={`font-medium transition-colors hover:text-teal-500 ${scrolled ? 'text-gray-600' : 'text-white/80 hover:text-white'}`}
                         >
                             {link}
@@ -90,7 +90,7 @@ const Header = ({ scrolled }: { scrolled: boolean }) => {
                     >
                         <div className="px-6 py-4 space-y-4">
                             {navLinks.map((link) => (
-                                <a key={link} href={`#${link.toLowerCase().replace(' ', '-')}`} className="block py-3 text-gray-700 font-medium border-b" onClick={() => setMobileMenuOpen(false)}>
+                                <a key={link} href={`#${link.toLowerCase().replace(/ /g, '-')}`} className="block py-3 text-gray-700 font-medium border-b" onClick={() => setMobileMenuOpen(false)}>
                                     {link}
                                 </a>
                             ))}
@@ -442,7 +442,7 @@ const CTASection = () => {
 
 // Footer
 const Footer = () => (
-    <footer className="py-16" style={{ backgroundColor: colors.deepCharcoal }}>
+    <footer id="contact" className="py-16" style={{ backgroundColor: colors.deepCharcoal }}>
         <div className="max-w-7xl mx-auto px-6">
             <div className="grid md:grid-cols-4 gap-12 mb-12">
                 {/* Brand */}
@@ -468,7 +468,27 @@ const Footer = () => (
                     <div key={col.title}>
                         <h4 className="text-white font-semibold mb-4">{col.title}</h4>
                         <ul className="space-y-3">
-                            {col.links.map(link => <li key={link}><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">{link}</a></li>)}
+                            {col.links.map(link => {
+                                const targetMap: Record<string, string> = {
+                                    'Features': 'features',
+                                    'How It Works': 'how-it-works',
+                                    'About Us': 'mission',
+                                    'Mission': 'mission',
+                                    'Contact': 'contact',
+                                    'Help Center': 'help',
+                                    'Getting Started': 'how-it-works'
+                                };
+                                const target = targetMap[link] || link.toLowerCase().replace(/ /g, '-');
+                                return (
+                                    <li key={link}>
+                                        <a href={`#${target}`} className="text-gray-400 hover:text-white transition-colors text-sm" onClick={(e) => {
+                                            if (!document.getElementById(target)) e.preventDefault();
+                                        }}>
+                                            {link}
+                                        </a>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 ))}
