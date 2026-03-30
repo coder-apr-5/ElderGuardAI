@@ -13,7 +13,7 @@
         "dev:chat": "npm run dev --prefix backend/ai-chat-service",
         "dev:auth": "npm run dev --prefix backend/auth-service",
         "dev:ml": "cd backend/python-ml && python -m uvicorn app.main:app --reload --port 8000",
-        "dev": "concurrently -n \"ELDER,API,CHAT,AUTH,ML\" -c \"bgGreen.bold,bgBlue.bold,bgMagenta.bold,bgCyan.bold,bgYellow.bold\" \"npm run dev:elder\" \"npm run dev:api\" \"npm run dev:chat\" \"npm run dev:auth\" \"npm run dev:ml\"",
+        "dev": "concurrently -n \"ELDER,FAMILY,API,CHAT,AUTH,ML\" -c \"bgGreen.bold,bgBlue.bold,bgMagenta.bold,bgCyan.bold,bgYellow.bold,bgRed.bold\" \"npm run dev:elder\" \"npm run dev:family\" \"npm run dev:api\" \"npm run dev:chat\" \"npm run dev:auth\" \"npm run dev:ml\"",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {

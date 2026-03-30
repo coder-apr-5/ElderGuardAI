@@ -39,7 +39,10 @@ export default defineConfig({
   ],
   envDir: path.resolve(__dirname, '../../'),
   server: {
-    port: 5173,
+    port: 5175,
+    fs: {
+      allow: ['../../'],
+    },
   },
   resolve: {
     alias: {
