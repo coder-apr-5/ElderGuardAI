@@ -10,7 +10,6 @@ import {
     OAuthButton,
     signUpElder,
     elderSignupSchema,
-    getFriendlyErrorMessage
 } from '@elder-nest/shared';
 
 type ElderSignupFormData = z.infer<typeof elderSignupSchema>;
@@ -56,7 +55,7 @@ const ElderSignupForm = () => {
             navigate('/auth/profile-setup');
         } catch (err: any) {
             console.error("Signup error:", err);
-            setError(getFriendlyErrorMessage(err.code) || "Signup failed. Please try again.");
+            setError(err.message || "Signup failed. Please try again.");
             setIsLoading(false);
         }
     };

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Check, Pill, Bell, Heart, Plus, X } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '@elder-nest/shared';
+import { auth, db, localUserStore } from '@elder-nest/shared';
 
 const ProfileSetupPage = () => {
     const navigate = useNavigate();
@@ -28,13 +28,24 @@ const ProfileSetupPage = () => {
         setIsLoading(true);
 
         try {
-            // Save medications to Firestore
+            // 1. Try to save to Firestore
             const user = auth.currentUser;
             if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
-                await updateDoc(userDocRef, {
-                    medications: medications,
-                    notificationPreferences: reminders,
+                try {
+                    const userDocRef = doc(db, 'users', user.uid);
+                    await updateDoc(userDocRef, {
+                        medications: medications,
+                        notificationPreferences: reminders,
+                        profileSetupComplete: true
+                    });
+                } catch (firestoreErr) {
+                    console.warn("⚠️ Firestore unavailable, skipping cloud update. Data will be saved locally.");
+                }
+                
+                // 2. Always update localStorage
+                localUserStore.update({
+                    medications: medications as any,
+                    notificationPreferences: reminders as any,
                     profileSetupComplete: true
                 });
             }

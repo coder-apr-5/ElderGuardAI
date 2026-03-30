@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Landing Pages (Public)
@@ -26,14 +27,36 @@ import { MyProfilePage } from "@/pages/family/MyProfilePage";
 import { ConnectElderPage } from "@/pages/family/ConnectElderPage";
 import { SettingsPage } from "@/pages/family/SettingsPage";
 
-import { ProtectedRoute } from "@elder-nest/shared";
+import { ProtectedRoute, processGoogleRedirectResult } from "@elder-nest/shared";
 
 const queryClient = new QueryClient();
+
+// Component to handle Google redirect result after page reload
+function GoogleRedirectHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    processGoogleRedirectResult().then((user) => {
+      if (user) {
+        const role = sessionStorage.getItem('google_signin_role') || 'elder';
+        console.log('✅ Google redirect completed, navigating...', role);
+        if (role === 'family') {
+          navigate('/family');
+        } else {
+          navigate('/dashboard');
+        }
+      }
+    });
+  }, [navigate]);
+
+  return null;
+}
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <GoogleRedirectHandler />
         <div className="min-h-screen bg-[#F8F9FA] text-[#2C3E50] font-sans">
           <Routes>
             {/* Public Landing Pages - First Impression */}

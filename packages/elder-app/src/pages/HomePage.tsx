@@ -15,7 +15,8 @@ import {
   Heart,
   LogOut,
   ArrowLeft,
-  User
+  User,
+  Sparkles
 } from "lucide-react";
 import { CameraMonitor } from "@/features/camera";
 import { RealTimeClock, ClockWidget } from "@/components/ClockWidget";
@@ -54,22 +55,40 @@ export const HomePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { auth, db } = await import("@elder-nest/shared");
+        const { auth, db, localUserStore } = await import("@elder-nest/shared");
         const { doc, getDoc } = await import("firebase/firestore");
         const user = auth.currentUser;
         if (!user) return;
 
         setUserName(user.displayName?.split(" ")[0] || "Friend");
 
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          setConnectionCode(data.connectionCode);
-          setEmergencyContact(data.emergencyContact);
-          setFamilyMembers(data.manualFamilyMembers || []);
+        let userData: any = null;
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid));
+          if (snap.exists()) {
+            userData = snap.data();
+            // Cache locally if Firestore succeeds
+            localUserStore.save({ ...userData, uid: user.uid });
+          }
+        } catch (e) {
+          console.warn("⚠️ Firestore unavailable on Home, trying Local Store...");
+        }
+
+        // Fallback to local store if Firestore failed or was empty
+        if (!userData) {
+          userData = localUserStore.get(user.uid);
+        }
+
+        if (userData) {
+          setConnectionCode(userData.connectionCode);
+          setEmergencyContact(userData.emergencyContact);
+          setFamilyMembers(userData.manualFamilyMembers || []);
+          if (userData.fullName) {
+             setUserName(userData.fullName.split(" ")[0]);
+          }
         }
       } catch (e) {
-        console.error(e);
+        console.error("Critical error fetching profile:", e);
       }
     };
     fetchProfile();
@@ -154,6 +173,26 @@ export const HomePage = () => {
           </div>
 
           <div className="flex gap-2 sm:gap-4 shrink-0">
+             {/* Centered Connection Code displaying as requested - only for elders */}
+            {connectionCode && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 px-2 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-sm"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="hidden sm:inline text-[9px] sm:text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest leading-none mb-1">Family Code</span>
+                  <span className="text-sm sm:text-lg font-mono font-black text-emerald-700 dark:text-white tracking-widest leading-none">{connectionCode}</span>
+                </div>
+                <button 
+                   onClick={shareCode}
+                   className="p-1 sm:p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-800 rounded-lg text-emerald-600 dark:text-emerald-300 transition-colors"
+                >
+                  <Sparkles size={14} className="sm:w-4 sm:h-4" />
+                </button>
+              </motion.div>
+            )}
+
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
@@ -188,41 +227,6 @@ export const HomePage = () => {
             </motion.button>
           </div>
         </div>
-
-        {/* ===== FAMILY CONNECTION CODE BAR ===== */}
-        {
-          connectionCode && showBanner && (
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-inner relative overflow-hidden">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex flex-wrap gap-2 sm:gap-4 justify-between items-center pr-10">
-                <div className="flex items-center gap-2">
-                  <Heart className="text-white/80 hidden xs:block" size={18} fill="currentColor" />
-                  <p className="font-medium text-sm sm:text-lg whitespace-nowrap">
-                    Code:
-                    <span className="ml-2 font-mono font-bold text-base sm:text-xl tracking-widest bg-white/20 px-2 sm:px-3 py-0.5 rounded-lg select-all">
-                      {connectionCode}
-                    </span>
-                  </p>
-                </div>
-                <button
-                  onClick={shareCode}
-                  className="px-4 py-1.5 rounded-full bg-white text-emerald-700 hover:bg-emerald-50 font-bold text-xs sm:text-sm shadow-sm transition-colors"
-                >
-                  Share
-                </button>
-              </div>
-              <button
-                onClick={() => setShowBanner(false)}
-                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/20 rounded-full transition-colors"
-                aria-label="Close Banner"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-          )
-        }
       </header >
 
       {/* ================= MAIN ================= */}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { onAuthStateChanged } from '../lib/firebase/auth'; // Ensure this path is correct
+import { onAuthStateChanged, localUserStore } from '../lib/firebase/auth'; 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import { Loader2 } from 'lucide-react';
@@ -43,36 +43,52 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
             }
 
             try {
-                // Fetch full user profile
-                const userDocRef = doc(db, 'users', firebaseUser.uid);
-                const userSnap = await getDoc(userDocRef);
-
-                if (!userSnap.exists()) {
-                    // User authenticated but no DB record? Rare.
-                    console.error("No user document found");
-                    navigate('/auth/login');
-                    return;
+                // Try to fetch from Firestore first
+                let userData: any = null;
+                try {
+                    const userDocRef = doc(db, 'users', firebaseUser.uid);
+                    const userSnap = await getDoc(userDocRef);
+                    if (userSnap.exists()) {
+                        userData = userSnap.data();
+                        // Cache in localStorage
+                        localUserStore.save({ ...userData, uid: firebaseUser.uid });
+                    }
+                } catch (firestoreErr) {
+                    console.warn("⚠️ Firestore unavailable during route protection, trying localStorage fallback...");
                 }
 
-                const userData = userSnap.data();
+                // Fallback to localStorage if Firestore failed or returned no data
+                if (!userData) {
+                    userData = localUserStore.get(firebaseUser.uid);
+                }
+
+                if (!userData) {
+                    // User authenticated but no DB record and no localStorage — 
+                    // could be a new Google sign-in where Firestore was unavailable.
+                    // Allow through with basic auth data from Firebase Auth.
+                    console.warn("⚠️ No user profile found (Firestore/Local), using basic auth data.");
+                    userData = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email || '',
+                        fullName: firebaseUser.displayName || '',
+                        role: (sessionStorage.getItem('google_signin_role') as any) || allowedRoles?.[0] || 'elder',
+                        profileSetupComplete: false
+                    };
+                }
 
                 // 1. Role Check
                 if (allowedRoles && !allowedRoles.includes(userData.role)) {
-                    // Wrong role (e.g. family trying to access elder pages)
-                    // Redirect to their appropriate home or denied page
                     if (userData.role === 'family') navigate('/family');
                     else navigate('/unauthorized');
                     return;
                 }
 
                 // 2. Profile Setup Check
-                // If the route requires setup, but user hasn't completed it -> Redirect to Setup
                 if (requireSetup && !userData.profileSetupComplete && userData.role === 'elder') {
                     navigate('/auth/profile-setup');
                     return;
                 }
 
-                // If we are ON the setup page, but setup IS complete -> Redirect to Home
                 if (location.pathname === '/auth/profile-setup' && userData.profileSetupComplete) {
                     navigate('/');
                     return;
@@ -81,8 +97,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
                 setUser({ ...firebaseUser, ...userData });
                 setLoading(false);
 
-            } catch (err) {
-                console.error("Error verifying user session:", err);
+            } catch (err: any) {
+                console.error("Critical error verifying user session:", err);
                 navigate('/auth/login');
             }
         });

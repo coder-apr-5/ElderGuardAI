@@ -10,7 +10,6 @@ import {
     OAuthButton,
     signInWithEmail,
     loginSchema,
-    getFriendlyErrorMessage
 } from '@elder-nest/shared';
 
 // Infer the type locally from loginSchema
@@ -42,7 +41,8 @@ const LoginPage = () => {
                 navigate('/dashboard');
             }
         } catch (err: any) {
-            setError(getFriendlyErrorMessage(err.code));
+            // signInWithEmail already throws Error with a friendly message
+            setError(err.message || 'Login failed. Please try again.');
         } finally {
             setIsLoading(false);
         }
