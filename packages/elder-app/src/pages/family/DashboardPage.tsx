@@ -64,7 +64,7 @@ export const DashboardPage = () => {
 
     // 3. Setup Emergency Alert Sound & Notifications
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
 
         if (elderStatus?.isEmergency && !isMuted) {
             // Request notification permission if not asked
@@ -225,7 +225,7 @@ export const DashboardPage = () => {
                             <div className="w-full h-full flex flex-col justify-between">
                                 <div className="text-center mb-2">
                                     <span className="text-4xl mb-1 block">
-                                        {elderStatus?.mood === 'happy' ? '😊' : elderStatus?.mood === 'sad' ? '😔' : elderStatus?.mood === 'okay' ? '�' : '😐'}
+                                        {elderStatus?.mood === 'happy' ? '😊' : elderStatus?.mood === 'sad' ? '😔' : elderStatus?.mood === 'okay' ? '😐' : '😐'}
                                     </span>
                                     <span className="text-sm font-medium text-slate-600">Current: <span className="capitalize">{elderStatus?.mood || 'Neutral'}</span></span>
                                 </div>
