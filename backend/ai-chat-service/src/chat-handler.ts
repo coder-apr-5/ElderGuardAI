@@ -66,33 +66,37 @@ export function initializeChatHandler(io: SocketIOServer): void {
 
             // Send welcome message if new conversation
             if (history.length === 0) {
-                const context = buildContext(elderId, profile);
+                try {
+                    const context = buildContext(elderId, profile);
 
-                // Generate personalized welcome
-                const welcomeResponse = await generateResponse('', {
-                    ...context,
-                    recentMessages: [{
-                        id: 'init',
+                    // Generate personalized welcome
+                    const welcomeResponse = await generateResponse('', {
+                        ...context,
+                        recentMessages: [{
+                            id: 'init',
+                            elderId,
+                            role: 'system',
+                            content: 'Elder has just started a new conversation. Greet them warmly and personally.',
+                            timestamp: new Date(),
+                        }],
+                    });
+
+                    const welcomeMessage: ChatMessage = {
+                        id: uuidv4(),
                         elderId,
-                        role: 'system',
-                        content: 'Elder has just started a new conversation. Greet them warmly and personally.',
+                        role: 'assistant',
+                        content: welcomeResponse.message,
                         timestamp: new Date(),
-                    }],
-                });
+                        metadata: { isProactive: true },
+                    };
 
-                const welcomeMessage: ChatMessage = {
-                    id: uuidv4(),
-                    elderId,
-                    role: 'assistant',
-                    content: welcomeResponse.message,
-                    timestamp: new Date(),
-                    metadata: { isProactive: true },
-                };
+                    history.push(welcomeMessage);
+                    conversationHistory.set(elderId, history);
 
-                history.push(welcomeMessage);
-                conversationHistory.set(elderId, history);
-
-                socket.emit('chat:response', welcomeMessage);
+                    socket.emit('chat:response', welcomeMessage);
+                } catch (err) {
+                    console.error('Error generating welcome:', err);
+                }
             } else {
                 // Send history to the client
                 socket.emit('chat:history', history.slice(-20));
@@ -232,21 +236,25 @@ export function initializeChatHandler(io: SocketIOServer): void {
 
             // Generate encouraging response
             const context = buildContext(elderId, elderInfo.profile);
-            const encouragement = await generateResponse(
-                `[SYSTEM: Elder just completed a routine. Give brief positive reinforcement.]`,
-                context
-            );
+            try {
+                const encouragement = await generateResponse(
+                    `[SYSTEM: Elder just completed a routine. Give brief positive reinforcement.]`,
+                    context
+                );
 
-            const message: ChatMessage = {
-                id: uuidv4(),
-                elderId,
-                role: 'assistant',
-                content: encouragement.message,
-                timestamp: new Date(),
-                metadata: { routineRelated: true, routineId: data.routineId },
-            };
+                const message: ChatMessage = {
+                    id: uuidv4(),
+                    elderId,
+                    role: 'assistant',
+                    content: encouragement.message,
+                    timestamp: new Date(),
+                    metadata: { routineRelated: true, routineId: data.routineId },
+                };
 
-            socket.emit('chat:response', message);
+                socket.emit('chat:response', message);
+            } catch (error) {
+                console.error('Error generating routine encouragement:', error);
+            }
 
             // Notify family of routine completion
             io.to(`family:${elderId}`).emit('routine:completed', {
@@ -361,24 +369,28 @@ function scheduleFollowUp(
             return;
         }
 
-        const followUp = await generateResponse(
-            '[SYSTEM: Check in on the elder, they seemed to be having a difficult time earlier. Be gentle and caring.]',
-            context
-        );
+        try {
+            const followUp = await generateResponse(
+                '[SYSTEM: Check in on the elder, they seemed to be having a difficult time earlier. Be gentle and caring.]',
+                context
+            );
 
-        const message: ChatMessage = {
-            id: uuidv4(),
-            elderId,
-            role: 'assistant',
-            content: followUp.message,
-            timestamp: new Date(),
-            metadata: { isProactive: true },
-        };
+            const message: ChatMessage = {
+                id: uuidv4(),
+                elderId,
+                role: 'assistant',
+                content: followUp.message,
+                timestamp: new Date(),
+                metadata: { isProactive: true },
+            };
 
-        history.push(message);
-        conversationHistory.set(elderId, history);
+            history.push(message);
+            conversationHistory.set(elderId, history);
 
-        io.to(`elder:${elderId}`).emit('companion:proactive', message);
+            io.to(`elder:${elderId}`).emit('companion:proactive', message);
+        } catch (error) {
+            console.error('Error generating follow-up response:', error);
+        }
 
     }, delayMinutes * 60 * 1000);
 }

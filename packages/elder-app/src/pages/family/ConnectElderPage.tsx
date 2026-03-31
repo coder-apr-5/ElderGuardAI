@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, Hash, Heart } from 'lucide-react';
-
+import { auth } from '@elder-nest/shared';
 
 export const ConnectElderPage = () => {
     const navigate = useNavigate();
@@ -23,13 +23,35 @@ export const ConnectElderPage = () => {
         setLoading(true);
 
         try {
-            // Find Elder by Code
-            const usersRef = collection(db, 'users');
-            // Remove 'role' from query to avoid Firestore composite index requirements
-            const q = query(usersRef, where('connectionCode', '==', code));
-            const querySnapshot = await getDocs(q);
+            const myId = auth.currentUser?.uid;
+            if (!myId) {
+                setError("You must be logged in.");
+                setLoading(false);
+                return;
+            }
 
-            if (querySnapshot.empty) {
+            let foundElderData: any = null;
+            let elderId = '';
+
+            // Find Elder by Code in local storage fallback
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('users_')) {
+                    try {
+                        const localUser = JSON.parse(localStorage.getItem(key) || '{}');
+                        const dataCode = (localUser.connectionCode || '').toString().trim().toUpperCase();
+                        if (localUser.role === 'elder' && dataCode === cleanCode) {
+                            foundElderData = localUser;
+                            elderId = localUser.uid;
+                            break;
+                        }
+                    } catch (e) {
+                         // ignore parse errors
+                    }
+                }
+            }
+
+            if (!foundElderData) {
                 setError('Invalid Family Code. Please check significantly.');
                 setLoading(false);
                 return;
@@ -46,18 +68,26 @@ export const ConnectElderPage = () => {
                         eldersConnected: [...eldersConnected, elderId]
                     }));
                 }
+            } else {
+                localStorage.setItem(`users_${myId}`, JSON.stringify({
+                     uid: myId,
+                     email: auth.currentUser?.email || '',
+                     fullName: auth.currentUser?.displayName || 'Family',
+                     role: 'family',
+                     eldersConnected: [elderId]
+                }));
             }
 
             // Update Elder Profile
-            const elderFam = elderData.familyMembers || [];
+            const elderFam = foundElderData.familyMembers || [];
             if (!elderFam.includes(myId)) {
                 localStorage.setItem(`users_${elderId}`, JSON.stringify({
-                    ...elderData,
+                    ...foundElderData,
                     familyMembers: [...elderFam, myId]
                 }));
             }
 
-            alert(`Successfully connected to ${elderData.fullName}!`);
+            alert(`Successfully connected to ${foundElderData.fullName}!`);
             navigate('/family/profile'); // Go to Elder Profile View
 
         } catch (err) {

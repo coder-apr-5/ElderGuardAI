@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import AICompanionChat from '../components/chat/AICompanionChat';
-import { auth, localUserStore } from '@elder-nest/shared';
+import { auth } from '@elder-nest/shared';
 
 const ChatPage: React.FC = () => {
     const [fontSize, setFontSize] = useState<'normal' | 'large' | 'extra-large'>('large');
@@ -18,12 +18,18 @@ const ChatPage: React.FC = () => {
             const user = auth.currentUser;
             if (user) {
                 setElderId(user.uid);
-                // Try from local store first as it's fastest
-                const userData = localUserStore.get(user.uid);
-                if (userData && userData.fullName) {
-                    setElderName(userData.fullName.split(' ')[0]);
-                } else if (user.displayName) {
-                    setElderName(user.displayName.split(' ')[0]);
+                try {
+                    const userDataStr = localStorage.getItem(`users_${user.uid}`);
+                    if (userDataStr) {
+                        const userData = JSON.parse(userDataStr);
+                        if (userData && userData.fullName) {
+                            setElderName(userData.fullName.split(' ')[0]);
+                        }
+                    } else if (user.displayName) {
+                        setElderName(user.displayName.split(' ')[0]);
+                    }
+                } catch (e) {
+                    // Ignore parse error
                 }
             }
         };
