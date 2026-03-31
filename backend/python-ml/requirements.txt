@@ -1,7 +1,5 @@
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ElderNest AI - ML Service Dependencies
 # Production-Ready Multi-Modal Risk Assessment
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Core FastAPI Framework
 fastapi==0.109.0
@@ -29,6 +27,7 @@ firebase-admin==6.3.0
 
 # External Integrations
 requests==2.31.0
+aiofiles>=23.2.1
 twilio==8.10.0
 
 # Utilities
@@ -46,7 +45,7 @@ types-requests==2.31.0.20240106
 
 # NEW - Multilingual
 openai==1.6.1
-elevenlabs==0.2.26
+elevenlabs==1.0.0
 google-cloud-speech==2.20.0
 google-cloud-texttospeech==2.14.1
 

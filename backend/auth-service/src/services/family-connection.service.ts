@@ -4,8 +4,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { getDb, Collections } from '../config/firebase';
-import { sendOTP, verifyOTP } from './otp.service';
+import { sendEmailOTP, verifyOTP } from './otp.service';
 import { validatePhoneNumber, isPhoneRegistered } from './phone.service';
+import { validateEmailAddress } from './email.service';
 import { logger } from '../utils/logger';
 import type { PendingConnection, FamilyRelation, OTPMetadata } from '../types';
 import admin from 'firebase-admin';
@@ -18,43 +19,50 @@ export async function createPendingConnection(
     elderPhone: string,
     elderName: string,
     elderAge: number | undefined,
-    familyPhone: string,
+    familyEmail: string,
     familyRelation: FamilyRelation,
     metadata: OTPMetadata = {}
 ): Promise<{ success: boolean; pendingId?: string; error?: string }> {
     const db = getDb();
 
-    // Validate elder phone (should already be validated, but double-check)
-    const elderValidation = validatePhoneNumber(elderPhone);
-    if (!elderValidation.isValid) {
-        return { success: false, error: 'Invalid elder phone number' };
+    // Validate elder phone (only if provided)
+    let elderE164 = '';
+    if (elderPhone && elderPhone.trim() !== '') {
+        const elderValidation = validatePhoneNumber(elderPhone);
+        if (!elderValidation.isValid) {
+            return { success: false, error: 'Invalid elder phone number' };
+        }
+        elderE164 = elderValidation.e164Format!;
+
+        // Check if elder already registered
+        if (await isPhoneRegistered(elderE164)) {
+            return { success: false, error: 'This elder is already registered' };
+        }
     }
 
-    // Validate family phone
-    const familyValidation = validatePhoneNumber(familyPhone);
-    if (!familyValidation.isValid) {
-        return { success: false, error: familyValidation.error || 'Invalid family phone number' };
+    // Validate family email
+    const emailValidation = await validateEmailAddress(familyEmail);
+    if (!emailValidation.isValid) {
+        return { success: false, error: emailValidation.error || 'Invalid family email address' };
     }
 
-    const elderE164 = elderValidation.e164Format!;
-    const familyE164 = familyValidation.e164Format!;
-
-    // Cannot be same number
-    if (elderE164 === familyE164) {
-        return { success: false, error: 'Elder and family phone numbers must be different' };
-    }
-
-    // Check if elder already registered
-    if (await isPhoneRegistered(elderE164)) {
-        return { success: false, error: 'This elder is already registered' };
-    }
+    const normalizedEmail = familyEmail.toLowerCase().trim();
 
     // Check for existing pending connection
-    const existingPending = await db
-        .collection(Collections.PENDING_CONNECTIONS)
-        .where('elderPhone', '==', elderE164)
-        .where('status', '==', 'pending')
-        .get();
+    let existingPending;
+    if (elderE164) {
+        existingPending = await db
+            .collection(Collections.PENDING_CONNECTIONS)
+            .where('elderPhone', '==', elderE164)
+            .where('status', '==', 'pending')
+            .get();
+    } else {
+        existingPending = await db
+            .collection(Collections.PENDING_CONNECTIONS)
+            .where('familyEmail', '==', normalizedEmail)
+            .where('status', '==', 'pending')
+            .get();
+    }
 
     // Cancel any existing pending connections
     const batch = db.batch();
@@ -68,25 +76,29 @@ export async function createPendingConnection(
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
 
-    const pendingConnection: PendingConnection = {
+    const pendingConnection: any = {
         id: pendingId,
         elderPhone: elderE164,
         elderName,
-        elderAge,
-        familyPhone: familyE164,
+        familyEmail: normalizedEmail,
         familyRelation,
         status: 'pending',
         createdAt: Timestamp.fromDate(now),
         expiresAt: Timestamp.fromDate(expiresAt),
     };
 
+    // Only add optional fields if they have values (Firestore doesn't allow undefined)
+    if (elderAge !== undefined && elderAge !== null) {
+        pendingConnection.elderAge = elderAge;
+    }
+
     await db.collection(Collections.PENDING_CONNECTIONS).doc(pendingId).set(pendingConnection);
 
-    // Send OTP to family member
-    const otpResult = await sendOTP(familyE164, 'family-verification', {
+    // Send email OTP to family member
+    const otpResult = await sendEmailOTP(normalizedEmail, 'family-verification', {
         ...metadata,
         pendingConnectionId: pendingId,
-    }, elderName);
+    }, elderName, familyRelation);
 
     if (!otpResult.success) {
         // Mark as failed
@@ -96,7 +108,7 @@ export async function createPendingConnection(
         return { success: false, error: otpResult.message };
     }
 
-    logger.info('Pending connection created', { pendingId, elderPhone: elderE164, familyPhone: familyE164 });
+    logger.info('Pending connection created (Email)', { pendingId, elderPhone: elderE164, familyEmail: normalizedEmail });
 
     return { success: true, pendingId };
 }
@@ -131,8 +143,8 @@ export async function verifyFamilyConnection(
         return { success: false, error: 'This connection request has expired' };
     }
 
-    // Verify OTP
-    const otpResult = await verifyOTP(pending.familyPhone, otp, 'family-verification');
+    // Verify OTP using family email
+    const otpResult = await verifyOTP(pending.familyEmail, otp, 'family-verification');
 
     if (!otpResult.success) {
         return { success: false, error: otpResult.message };
@@ -145,7 +157,7 @@ export async function verifyFamilyConnection(
         otpId: otpResult.otpId,
     });
 
-    logger.info('Family connection verified', { pendingId });
+    logger.info('Family connection verified via Email', { pendingId });
 
     return { success: true };
 }
@@ -165,15 +177,16 @@ export async function getPendingConnection(pendingId: string): Promise<PendingCo
 }
 
 /**
- * Get pending connections for a family phone
+ * Get pending connections for a family email
  */
-export async function getPendingConnectionsForFamily(familyPhone: string): Promise<PendingConnection[]> {
+export async function getPendingConnectionsForFamily(familyEmail: string): Promise<PendingConnection[]> {
     const db = getDb();
     const now = new Date();
+    const normalizedEmail = familyEmail.toLowerCase().trim();
 
     const query = await db
         .collection(Collections.PENDING_CONNECTIONS)
-        .where('familyPhone', '==', familyPhone)
+        .where('familyEmail', '==', normalizedEmail)
         .where('status', '==', 'pending')
         .get();
 

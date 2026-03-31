@@ -3,14 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Calendar, Phone, Check, ChevronRight, ChevronLeft, Heart, Sun, Sparkles } from 'lucide-react';
+import { User, Mail, Lock, Calendar, Check, ChevronRight, ChevronLeft, Heart, Sun, Sparkles } from 'lucide-react';
 import { z } from 'zod';
 
 import {
     OAuthButton,
-    signUpElder,
-    elderSignupSchema,
-    getFriendlyErrorMessage
+    elderSignupSchema
 } from '@elder-nest/shared';
 
 type ElderSignupFormData = z.infer<typeof elderSignupSchema>;
@@ -20,8 +18,9 @@ const ElderSignupForm = () => {
     const [step, setStep] = useState(1);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [pendingId, setPendingId] = useState<string | null>(null);
 
-    const { register, handleSubmit, trigger, formState: { errors } } = useForm<ElderSignupFormData>({
+    const { register, handleSubmit, trigger, getValues, formState: { errors } } = useForm<ElderSignupFormData & { verificationCode: string }>({
         resolver: zodResolver(elderSignupSchema),
         mode: 'onChange'
     });
@@ -29,34 +28,83 @@ const ElderSignupForm = () => {
     const nextStep = async () => {
         let fieldsToValidate: (keyof ElderSignupFormData)[] = [];
         if (step === 1) fieldsToValidate = ['fullName', 'email', 'password', 'confirmPassword'];
-        if (step === 2) fieldsToValidate = ['dateOfBirth', 'emergencyContact', 'relationship'];
+        if (step === 2) fieldsToValidate = ['dateOfBirth', 'familyEmail', 'relationship'];
 
         const isValid = await trigger(fieldsToValidate);
 
-        console.log(`Step ${step} validation result:`, isValid);
-        if (!isValid) {
-            console.log("Validation errors:", errors);
-        }
-
         if (isValid) {
-            setStep(prev => prev + 1);
-            setError(null);
+            if (step === 2) {
+                setIsLoading(true);
+                setError(null);
+                try {
+                    const data = getValues();
+                    const fullUrl = `${import.meta.env.VITE_AUTH_SERVICE_URL}/api/auth/elder/initiate-family-verification`;
+                    console.log("Initiating family verification for:", data.familyEmail, "at", fullUrl);
+                    
+                    const response = await fetch(fullUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            elderName: data.fullName,
+                            familyEmail: data.familyEmail,
+                            familyRelation: data.relationship
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Failed to send verification code');
+                    
+                    setPendingId(result.pendingId);
+                    setStep(prev => prev + 1);
+                } catch (err: any) {
+                    setError(err.message || "Failed to initiate verification. Please try again.");
+                    setIsLoading(false);
+                    return;
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                setStep(prev => prev + 1);
+                setError(null);
+            }
         }
     };
 
     const prevStep = () => setStep(prev => prev - 1);
 
-    const onSubmit = async (data: ElderSignupFormData) => {
+    const onSubmit = async (data: any) => {
         setIsLoading(true);
         setError(null);
         try {
-            console.log("Submitting elder signup...", data);
-            await signUpElder(data);
-            console.log("Signup successful, navigating to profile setup...");
+            const fullUrl = `${import.meta.env.VITE_AUTH_SERVICE_URL}/api/auth/elder/complete-signup`;
+            console.log("Completing elder setup at", fullUrl);
+            
+            const response = await fetch(fullUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pendingId,
+                    otp: data.verificationCode,
+                    elderData: {
+                        fullName: data.fullName,
+                        email: data.email,
+                        password: data.password,
+                        dateOfBirth: data.dateOfBirth,
+                        familyEmail: data.familyEmail,
+                        relationship: data.relationship
+                    }
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Verification failed');
+
+            // Success! 
+            console.log("Signup successful!");
             navigate('/auth/profile-setup');
         } catch (err: any) {
             console.error("Signup error:", err);
-            setError(getFriendlyErrorMessage(err.code) || "Signup failed. Please try again.");
+            setError(err.message || "Verification failed. Please check the code.");
             setIsLoading(false);
         }
     };
@@ -292,48 +340,19 @@ const ElderSignupForm = () => {
                                         {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message?.toString()}</p>}
                                     </div>
 
-                                    {/* Family Member's Phone Number (was Emergency Contact) */}
+                                    {/* Family Member's Email */}
                                     <div>
-                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Family Member's Phone Number</label>
-                                        <div className="flex gap-2">
-                                            <select
-                                                className="w-28 px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white text-sm"
-                                                onChange={(e) => {
-                                                    const phoneInput = document.getElementById('emergencyPhone') as HTMLInputElement;
-                                                    if (phoneInput) {
-                                                        const currentVal = phoneInput.value.replace(/^\+\d+\s?/, '');
-                                                        phoneInput.value = e.target.value + ' ' + currentVal;
-                                                        phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                                    }
-                                                }}
-                                            >
-                                                <option value="+1">🇺🇸 +1</option>
-                                                <option value="+44">🇬🇧 +44</option>
-                                                <option value="+91">🇮🇳 +91</option>
-                                                <option value="+61">🇦🇺 +61</option>
-                                                <option value="+86">🇨🇳 +86</option>
-                                                <option value="+81">🇯🇵 +81</option>
-                                                <option value="+49">🇩🇪 +49</option>
-                                                <option value="+33">🇫🇷 +33</option>
-                                                <option value="+39">🇮🇹 +39</option>
-                                                <option value="+7">🇷🇺 +7</option>
-                                                <option value="+55">🇧🇷 +55</option>
-                                                <option value="+971">🇦🇪 +971</option>
-                                                <option value="+65">🇸🇬 +65</option>
-                                                <option value="+60">🇲🇾 +60</option>
-                                            </select>
-                                            <div className="relative flex-1">
-                                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                                <input
-                                                    id="emergencyPhone"
-                                                    type="tel"
-                                                    {...register('emergencyContact')}
-                                                    placeholder="+1 234 567 8900"
-                                                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
-                                                />
-                                            </div>
+                                        <label className="block text-gray-700 font-medium mb-1 text-sm">Family Member's Email</label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <input
+                                                type="email"
+                                                {...register('familyEmail')}
+                                                placeholder="family@example.com"
+                                                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
+                                            />
                                         </div>
-                                        {errors.emergencyContact && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.message}</p>}
+                                        {errors.familyEmail && <p className="text-red-500 text-xs mt-1">{errors.familyEmail.message}</p>}
                                     </div>
 
                                     {/* Terms */}
@@ -379,7 +398,7 @@ const ElderSignupForm = () => {
                                     className="space-y-4"
                                 >
                                     <div className="bg-orange-50 p-3 rounded-xl text-orange-800 text-sm">
-                                        We sent a verification code to your family member's number.
+                                        We sent a verification code to your family member's email address.
                                     </div>
 
                                     <div>
@@ -389,15 +408,13 @@ const ElderSignupForm = () => {
                                             <input
                                                 type="text"
                                                 maxLength={6}
+                                                {...register('verificationCode', { required: true })}
                                                 placeholder="Enter 6-digit code"
                                                 className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white tracking-widest text-lg font-mono"
-                                                onChange={(e) => {
-                                                    // Simple validation visual feedback could go here
-                                                }}
                                             />
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1">
-                                            Normally you would receive an SMS. For this demo, please enter any code.
+                                            They will receive the code via email. Please enter it here.
                                         </p>
                                     </div>
                                 </motion.div>

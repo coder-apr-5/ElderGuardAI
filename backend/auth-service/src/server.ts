@@ -20,7 +20,7 @@ import authRoutes from './routes/auth.routes';
 import connectionRoutes from './routes/connection.routes';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5002;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Middleware

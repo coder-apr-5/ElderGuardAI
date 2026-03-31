@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 import { getDb, getFirebaseAuth, Collections } from '../config/firebase';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, getTokenExpirySeconds, jwtConfig } from '../config/jwt';
 import { sendOTP, verifyOTP } from './otp.service';
-import { validatePhoneNumber, isPhoneRegistered, getUserByPhone } from './phone.service';
+import { validatePhoneNumber, getUserByPhone } from './phone.service';
 import { validateEmailAddress, isEmailRegistered, getUserByEmail, normalize as normalizeEmail } from './email.service';
 import { createPendingConnection, verifyFamilyConnection, getPendingConnection } from './family-connection.service';
 import { logger, logAuthEvent, logSecurityEvent } from '../utils/logger';
@@ -141,197 +141,138 @@ async function resetFailedLogins(userId: string): Promise<void> {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Elder Signup Flow
+// Elder Signup (Controlled Flow)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
- * Step 1: Elder initiates signup with phone
+ * Initiate family verification via email
  */
-export async function elderSignupStep1(
-    phone: string,
-    countryCode: string,
-    metadata: { userAgent?: string; ipAddress?: string }
-): Promise<{ success: boolean; message: string; phone?: string }> {
-    // Validate phone
-    const validation = validatePhoneNumber(phone, countryCode);
-    if (!validation.isValid) {
-        return { success: false, message: validation.error || 'Invalid phone number' };
-    }
-
-    const e164Phone = validation.e164Format!;
-
-    // Check if already registered
-    if (await isPhoneRegistered(e164Phone)) {
-        return { success: false, message: 'This phone number is already registered. Please login instead.' };
-    }
-
-    // Send OTP
-    const otpResult = await sendOTP(e164Phone, 'signup', metadata);
-
-    if (!otpResult.success) {
-        return { success: false, message: otpResult.message };
-    }
-
-    logAuthEvent('ELDER_SIGNUP_INITIATED', { phone: e164Phone });
-
-    return {
-        success: true,
-        message: 'Verification code sent to your phone',
-        phone: validation.nationalFormat,
-    };
-}
-
-/**
- * Step 2: Elder verifies phone with OTP
- */
-export async function elderSignupStep2(
-    phone: string,
-    countryCode: string,
-    otp: string
-): Promise<{ success: boolean; message: string; verificationToken?: string }> {
-    const validation = validatePhoneNumber(phone, countryCode);
-    if (!validation.isValid) {
-        return { success: false, message: 'Invalid phone number' };
-    }
-
-    const e164Phone = validation.e164Format!;
-
-    const verifyResult = await verifyOTP(e164Phone, otp, 'signup');
-
-    if (!verifyResult.success) {
-        return { success: false, message: verifyResult.message };
-    }
-
-    logAuthEvent('ELDER_PHONE_VERIFIED', { phone: e164Phone });
-
-    return {
-        success: true,
-        message: 'Phone verified successfully',
-        verificationToken: verifyResult.otpId, // Use OTP ID as temporary token
-    };
-}
-
-/**
- * Step 3: Elder provides info and family phone
- */
-export async function elderSignupStep3(
-    elderPhone: string,
-    elderCountryCode: string,
+export async function initiateFamilyVerification(
     elderName: string,
-    age: number,
-    familyPhone: string,
-    familyCountryCode: string,
+    familyEmail: string,
     familyRelation: FamilyRelation,
-    _verificationToken: string,
-    metadata: { userAgent?: string; ipAddress?: string }
-): Promise<{ success: boolean; message: string; pendingConnectionId?: string; familyPhoneDisplay?: string }> {
-    // Validate elder phone
-    const elderValidation = validatePhoneNumber(elderPhone, elderCountryCode);
-    if (!elderValidation.isValid) {
-        return { success: false, message: 'Invalid elder phone number' };
-    }
-
-    // Validate family phone
-    const familyValidation = validatePhoneNumber(familyPhone, familyCountryCode);
-    if (!familyValidation.isValid) {
-        return { success: false, message: familyValidation.error || 'Invalid family member phone number' };
-    }
-
-    const elderE164 = elderValidation.e164Format!;
-    const familyE164 = familyValidation.e164Format!;
-
-    // Create pending connection and send OTP to family
+    metadata: any = {}
+): Promise<{ success: boolean; message: string; pendingId?: string }> {
     const result = await createPendingConnection(
-        elderE164,
+        '', // No elder phone in initial step
         elderName,
-        age,
-        familyE164,
+        undefined,
+        familyEmail,
         familyRelation,
         metadata
     );
 
     if (!result.success) {
-        return { success: false, message: result.error || 'Failed to initiate family verification' };
+        return { success: false, message: result.error || 'Failed to initiate verification' };
     }
-
-    logAuthEvent('FAMILY_VERIFICATION_SENT', { elderPhone: elderE164, familyPhone: familyE164 });
 
     return {
         success: true,
-        message: `Verification code sent to your family member at ${familyValidation.nationalFormat}`,
-        pendingConnectionId: result.pendingId,
-        familyPhoneDisplay: familyValidation.nationalFormat,
+        message: 'Verification code sent to family email',
+        pendingId: result.pendingId,
     };
 }
 
 /**
- * Step 4: Family verifies and elder account is created
+ * Complete elder signup after family verification
  */
-export async function elderSignupStep4(
-    pendingConnectionId: string,
+export async function completeElderSignup(
+    pendingId: string,
     otp: string,
-    metadata: { userAgent?: string; ipAddress?: string }
-): Promise<AuthResponse & { success: boolean; message?: string }> {
-    // Get pending connection
-    const pending = await getPendingConnection(pendingConnectionId);
-    if (!pending) {
-        return { success: false, message: 'Connection request not found', user: {}, accessToken: '', refreshToken: '', expiresIn: 0 };
-    }
-
-    // Verify family OTP
-    const verifyResult = await verifyFamilyConnection(pendingConnectionId, otp);
-    if (!verifyResult.success) {
-        return { success: false, message: verifyResult.error, user: {}, accessToken: '', refreshToken: '', expiresIn: 0 };
-    }
-
-    // Create elder account
+    elderData: any,
+    metadata: any = {}
+): Promise<AuthResponse | { success: boolean; message: string }> {
     const db = getDb();
-    const elderUid = uuidv4();
-    const now = new Date();
 
-    const elderUser: User = {
-        uid: elderUid,
-        role: 'elder',
-        phone: pending.elderPhone,
-        fullName: pending.elderName,
-        age: pending.elderAge,
-        createdAt: Timestamp.fromDate(now),
-        updatedAt: Timestamp.fromDate(now),
-        lastLogin: Timestamp.fromDate(now),
-        accountStatus: 'active',
-        failedLoginAttempts: 0,
-        connectedFamily: [],
-        authProvider: 'phone',
-        emailVerified: false,
-        phoneVerified: true,
-        notificationsEnabled: true,
-    };
+    // 1. Verify family connection
+    const verificationResult = await verifyFamilyConnection(pendingId, otp);
+    if (!verificationResult.success) {
+        return { success: false, message: verificationResult.error || 'Verification failed' };
+    }
 
-    await db.collection(Collections.USERS).doc(elderUid).set(elderUser);
+    // 2. Get pending connection details
+    const pendingConnection = await getPendingConnection(pendingId);
+    if (!pendingConnection) {
+        return { success: false, message: 'Connection request not found' };
+    }
 
-    // Update pending connection
-    await db.collection(Collections.PENDING_CONNECTIONS).doc(pendingConnectionId).update({
-        elderUid,
-    });
+    // 3. Create Firebase Auth user for the elder
+    try {
+        const authRef = getFirebaseAuth();
+        const userRecord = await authRef.createUser({
+            email: elderData.email,
+            password: elderData.password,
+            displayName: elderData.fullName,
+        });
 
-    // Create auth tokens
-    const tokens = createAuthTokens(elderUser);
-    await storeRefreshToken(elderUid, tokens.refreshToken, metadata);
+        // 4. Create User doc in Firestore
+        const now = Timestamp.now();
+        const user: any = {
+            uid: userRecord.uid,
+            role: 'elder',
+            email: elderData.email,
+            fullName: elderData.fullName,
+            createdAt: now,
+            updatedAt: now,
+            lastLogin: now,
+            accountStatus: 'active',
+            failedLoginAttempts: 0,
+            authProvider: 'email',
+            emailVerified: false,
+            phoneVerified: false,
+            notificationsEnabled: true,
+            connectedFamily: [],
+        };
 
-    logAuthEvent('ELDER_ACCOUNT_CREATED', { uid: elderUid, phone: pending.elderPhone });
+        // Add optional fields only if they exist (Firestore doesn't allow undefined)
+        if (elderData.dateOfBirth) user.dateOfBirth = elderData.dateOfBirth;
+        if (elderData.age) user.age = elderData.age;
 
-    return {
-        success: true,
-        user: {
-            uid: elderUser.uid,
-            role: elderUser.role,
-            phone: elderUser.phone,
-            fullName: elderUser.fullName,
-            age: elderUser.age,
-            accountStatus: elderUser.accountStatus,
-        },
-        ...tokens,
-    };
+        await db.collection(Collections.USERS).doc(userRecord.uid).set(user);
+
+        // 5. Link family member if they are already registered
+        const familyUser = await getUserByEmail(pendingConnection.familyEmail);
+        if (familyUser) {
+            // Need to link them
+            await db.collection(Collections.USERS).doc(userRecord.uid).update({
+                connectedFamily: admin.firestore.FieldValue.arrayUnion(familyUser.uid)
+            });
+            await db.collection(Collections.USERS).doc(familyUser.uid).update({
+                connectedElders: admin.firestore.FieldValue.arrayUnion(userRecord.uid)
+            });
+        }
+
+        // 6. Generate tokens
+        const tokens = createAuthTokens(user);
+        await storeRefreshToken(user.uid, tokens.refreshToken, metadata);
+
+        // 7. Update pending connection status
+        await db.collection(Collections.PENDING_CONNECTIONS).doc(pendingId).update({
+            status: 'verified',
+            elderUid: userRecord.uid,
+            familyUid: familyUser?.uid,
+        });
+
+        logger.info('Elder signup completed successfully', { elderUid: userRecord.uid, familyEmail: pendingConnection.familyEmail });
+
+        return {
+            success: true,
+            user: {
+                uid: user.uid,
+                role: user.role,
+                email: user.email,
+                fullName: user.fullName,
+                accountStatus: user.accountStatus,
+            },
+            ...tokens
+        };
+    } catch (error: any) {
+        logger.error('Error completing elder signup', { error });
+        if (error.code === 'auth/email-already-in-use') {
+            return { success: false, message: 'This email is already registered' };
+        }
+        return { success: false, message: 'Failed to create account. Please try again later.' };
+    }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -790,10 +731,8 @@ export async function logout(userId: string, refreshToken?: string): Promise<voi
 
 export default {
     // Elder signup
-    elderSignupStep1,
-    elderSignupStep2,
-    elderSignupStep3,
-    elderSignupStep4,
+    initiateFamilyVerification,
+    completeElderSignup,
     // Family signup
     familySignup,
     // Login

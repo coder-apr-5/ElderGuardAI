@@ -22,7 +22,9 @@ const OAuthButton: React.FC<OAuthButtonProps> = ({ role, onSuccess, onError, tex
             onSuccess?.(user);
         } catch (error: any) {
             console.error(error);
-            onError?.(getFriendlyErrorMessage(error.code));
+            // signInWithGoogle already formats the error.message, but just in case it's a raw Firebase error we parse error.code
+            const finalMessage = error.code ? getFriendlyErrorMessage(error.code) : error.message;
+            onError?.(finalMessage || "Authentication failed. Please try again.");
         } finally {
             setLoading(false);
         }

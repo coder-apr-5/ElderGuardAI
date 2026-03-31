@@ -25,12 +25,17 @@ export function initializeAI(): void {
 
     genAI = new GoogleGenerativeAI(apiKey);
     model = genAI.getGenerativeModel({
-        model: process.env.AI_MODEL || 'gemini-1.5-flash',
+        model: process.env.AI_MODEL || 'gemini-2.5-flash',
+        systemInstruction: {
+            role: 'system',
+            parts: [{ text: "You are Mira, a warm, caring, and patient AI companion for elders. Your goal is to provide companionship, emotional support, and gentle health reminders. Always be respectful, empathetic, and encouraging. \n\nIMPORTANT: You must ALWAYS respond in a valid JSON format with the following keys:\n{\n  \"mood\": \"happy|sad|anxious|lonely|neutral|excited\",\n  \"message\": \"Your warm, empathetic response here\",\n  \"should_follow_up\": true|false,\n  \"sentiment_score\": -1.0 to 1.0\n}" }]
+        },
         generationConfig: {
             temperature: parseFloat(process.env.AI_TEMPERATURE || '0.8'),
             maxOutputTokens: parseInt(process.env.AI_MAX_TOKENS || '500'),
             topP: 0.9,
             topK: 40,
+            responseMimeType: "application/json",
         },
         safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -40,7 +45,7 @@ export function initializeAI(): void {
         ] as any,
     });
 
-    console.log('✅ AI Service initialized with Gemini');
+    console.log('✅ AI Service initialized with Gemini (System Instruction enabled)');
 }
 
 /**
@@ -60,22 +65,46 @@ function getOrCreateSession(context: ConversationContext): ChatSession | null {
     const systemPrompt = generateSystemPrompt(context.elderProfile);
     const contextPrompt = generateContextPrompt(context);
 
-    // Convert recent messages to Gemini format
-    const history = context.recentMessages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
-    }));
+    // Convert recent messages to Gemini format, ensuring alternating roles
+    const history: any[] = [];
+    
+    // Add a single 'user' message with instructions if needed for context
+    const instructionMessage = `[CONTEXT UPDATE]\n${systemPrompt}\n${contextPrompt}\n[END CONTEXT UPDATE]`;
+    history.push({ role: 'user', parts: [{ text: instructionMessage }] });
+    history.push({ role: 'model', parts: [{ text: "I understand. I am ready to continue our conversation with this context." }] });
+
+    // Filter and add previous messages, ensuring we don't have two 'model' messages in a row
+    const filteredMessages = context.recentMessages.filter(msg => msg.role === 'user' || msg.role === 'assistant');
+    
+    for (const msg of filteredMessages) {
+        const role = msg.role === 'user' ? 'user' : 'model';
+        // Basic check to ensure alternating roles
+        if (history.length > 0 && history[history.length - 1].role === role) {
+            // Append to previous message instead of starting new one
+            history[history.length - 1].parts[0].text += `\n${msg.content}`;
+        } else {
+            history.push({
+                role,
+                parts: [{ text: msg.content }],
+            });
+        }
+    }
+
+    let finalHistory = history;
+    if (finalHistory.length > 12) {
+        finalHistory = finalHistory.slice(-12);
+        // Gemini history MUST start with 'user'
+        if (finalHistory.length > 0 && finalHistory[0].role === 'model') {
+            finalHistory = finalHistory.slice(1);
+        }
+    }
 
     const session = model.startChat({
-        history: [
-            // System prompt as first interaction
-            { role: 'user', parts: [{ text: `[SYSTEM INSTRUCTIONS - INTERNAL ONLY]\n${systemPrompt}\n${contextPrompt}\n[END SYSTEM INSTRUCTIONS]\n\nPlease acknowledge you understand your role as ${process.env.COMPANION_NAME || 'Mira'}.` }] },
-            { role: 'model', parts: [{ text: `I understand completely! I'm ${process.env.COMPANION_NAME || 'Mira'}, a warm and caring companion for ${context.elderProfile.preferredName || context.elderProfile.fullName || 'my dear friend'}. I'm here with patience, empathy, and genuine care. I'll remember their preferences, check on their routines gently, and always treat them with the respect and dignity they deserve. I'm ready to be a good friend! 💝` }] },
-            ...history.slice(-10), // Keep last 10 messages for context
-        ],
+        history: finalHistory,
         generationConfig: {
             temperature: parseFloat(process.env.AI_TEMPERATURE || '0.8'),
             maxOutputTokens: parseInt(process.env.AI_MAX_TOKENS || '500'),
+            responseMimeType: "application/json",
         },
     });
 
@@ -93,34 +122,71 @@ export async function generateResponse(
     try {
         const session = getOrCreateSession(context);
 
-        // Detect mood from message
-        const detectedMood = analyzeMoodIndicators(userMessage);
-
         // If AI not configured, return simulated response
         if (!session) {
-            return generateSimulatedResponse(userMessage, context, detectedMood);
+            return generateSimulatedResponse(userMessage, context, 'neutral');
         }
 
-        // Add mood context if detected
-        let enrichedMessage = userMessage;
-        if (detectedMood) {
-            enrichedMessage = `[User seems ${detectedMood}] ${userMessage}`;
-        }
+        // Let the AI analyze the mood itself natively
+        const enrichedMessage = userMessage;
 
         // Generate response
+        console.log(`🤖 Generating AI response for message: "${userMessage.substring(0, 30)}..."`);
         const result = await session.sendMessage(enrichedMessage);
-        const response = result.response;
-        const text = response.text();
+        const responseText = result.response.text();
 
+        try {
+            // Try to extract JSON from response (Gemini sometimes adds ```json blocks)
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            const jsonData = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(responseText);
+
+            const aiMood = jsonData.mood || 'neutral';
+
+            return {
+                message: jsonData.message || responseText,
+                mood: aiMood,
+                shouldFollowUp: jsonData.should_follow_up ?? (aiMood === 'sad' || aiMood === 'lonely' || aiMood === 'anxious'),
+                followUpDelay: aiMood !== 'neutral' ? 30 : undefined,
+            };
+        } catch (e) {
+            console.warn('Failed to parse AI JSON response, falling back to raw text');
+            let cleanMessage = responseText;
+            
+            // Try to salvage the message from broken JSON
+            const messageMatch = responseText.match(/"message"\s*:\s*"([\s\S]*?)(?:"\s*(?:}|,)|$)/);
+            if (messageMatch && messageMatch[1]) {
+                cleanMessage = messageMatch[1];
+            } else {
+                // Strip markdown blocks
+                cleanMessage = cleanMessage.replace(/```json/gi, '').replace(/```/g, '');
+                
+                // Strip JSON wrapper if it got generated without "message" explicitly matched above
+                if (cleanMessage.includes('{')) {
+                    cleanMessage = cleanMessage.replace(/\{\s*"mood"\s*:\s*"[^"]*",?\s*(?:"message"\s*:\s*")?/gi, '');
+                    cleanMessage = cleanMessage.replace(/\}\s*$/g, '').trim();
+                }
+            }
+            
+            // Remove any trailing unclosed quotes from cutoff
+            if (cleanMessage.endsWith('"')) {
+                cleanMessage = cleanMessage.substring(0, cleanMessage.length - 1);
+            }
+
+            return {
+                message: cleanMessage,
+                mood: 'neutral',
+                shouldFollowUp: false,
+                followUpDelay: undefined,
+            };
+        }
+    } catch (error: any) {
+        console.error('❌ AI response error:', error.message || error);
+        if (error.stack) console.error(error.stack);
+        
         return {
-            message: text,
-            mood: detectedMood,
-            shouldFollowUp: detectedMood === 'sad' || detectedMood === 'lonely' || detectedMood === 'anxious',
-            followUpDelay: detectedMood ? 30 : undefined, // Follow up in 30 mins if concerning mood
+            message: `Mira is having a little trouble thinking. Please try again! (Error: ${error.message || 'unknown error'})`,
+            mood: 'neutral'
         };
-    } catch (error) {
-        console.error('AI response error:', error);
-        return generateFallbackResponse(context);
     }
 }
 
@@ -141,13 +207,43 @@ export async function generateProactiveMessage(
         }
 
         const result = await session.sendMessage(`[PROACTIVE MESSAGE - ${reason.toUpperCase()}] ${prompt}`);
-        const text = result.response.text();
+        const responseText = result.response.text();
 
-        return {
-            message: text,
-            shouldFollowUp: reason === 'loneliness' || reason === 'check_in',
-            followUpDelay: 60,
-        };
+        try {
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            const jsonData = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(responseText);
+
+            return {
+                message: jsonData.message || responseText,
+                shouldFollowUp: jsonData.should_follow_up ?? (reason === 'loneliness' || reason === 'check_in'),
+                followUpDelay: 60,
+            };
+        } catch (e) {
+            console.warn('Failed to parse Proactive AI JSON response, falling back to raw text');
+            let cleanMessage = responseText;
+            
+            // Try to salvage the message from broken JSON
+            const messageMatch = responseText.match(/"message"\s*:\s*"([\s\S]*?)(?:"\s*(?:}|,)|$)/);
+            if (messageMatch && messageMatch[1]) {
+                cleanMessage = messageMatch[1];
+            } else {
+                cleanMessage = cleanMessage.replace(/```json/gi, '').replace(/```/g, '');
+                if (cleanMessage.includes('{')) {
+                    cleanMessage = cleanMessage.replace(/\{\s*"mood"\s*:\s*"[^"]*",?\s*(?:"message"\s*:\s*")?/gi, '');
+                    cleanMessage = cleanMessage.replace(/\}\s*$/g, '').trim();
+                }
+            }
+            
+            if (cleanMessage.endsWith('"')) {
+                cleanMessage = cleanMessage.substring(0, cleanMessage.length - 1);
+            }
+
+            return {
+                message: cleanMessage,
+                shouldFollowUp: reason === 'loneliness' || reason === 'check_in',
+                followUpDelay: 60,
+            };
+        }
     } catch (error) {
         console.error('Proactive message error:', error);
         return generateSimulatedProactiveResponse(context, reason, routine);
@@ -176,6 +272,10 @@ function generateSimulatedResponse(
 
     let response = '';
 
+    if (mood) {
+        console.log(`[DEBUG] Detected mood: ${mood} for message: "${userMessage}"`);
+    }
+
     if (lowerMsg.includes('hello') || lowerMsg.includes('hi ') || lowerMsg === 'hi') {
         response = `Hello there, ${name}! 😊 It's so lovely to hear from you. How are you feeling today?`;
     } else if (lowerMsg.includes('how are you')) {
@@ -184,8 +284,16 @@ function generateSimulatedResponse(
         response = `Good morning, ${name}! ☀️ I hope you had a restful sleep. What's on your mind this beautiful morning?`;
     } else if (lowerMsg.includes('good night')) {
         response = `Good night, ${name}! 🌙 I hope you have sweet dreams. Rest well, and I'll be here whenever you need me. Take care!`;
+    } else if (mood === 'happy') {
+        response = `I'm so glad to hear you're feeling good, ${name}! 😊 That brings a smile to my face. What's been the best part of your day so far?`;
     } else if (mood === 'sad' || mood === 'lonely') {
         response = `I can hear that you might be going through a tough time, ${name}. I'm here for you, and I care about you. Would you like to tell me more about what's on your mind? Sometimes it helps to talk. 💝`;
+    } else if (mood === 'anxious') {
+        response = `I can feel that you're feeling a bit uneasy, ${name}. Please take a deep breath with me. I'm right here, and you're safe. Is there anything specific on your mind that we could talk through?`;
+    } else if (mood === 'frustrated') {
+        response = `I'm sorry you're feeling frustrated, ${name}. It's completely okay to feel that way sometimes! Would you like to vent about it, or should we talk about something else to help clear your mind?`;
+    } else if (mood === 'pain') {
+        response = `I'm so sorry to hear you're in pain, ${name}. (hugs) Please take it easy. Have you told your family or a doctor about this? I'm here to keep you company while you rest.`;
     } else if (lowerMsg.includes('medicine') || lowerMsg.includes('medication')) {
         response = `I'm glad you're thinking about your medication, ${name}! Taking care of your health is so important. Have you been able to take it on time today?`;
     } else if (lowerMsg.includes('thank')) {

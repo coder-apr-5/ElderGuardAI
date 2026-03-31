@@ -106,7 +106,7 @@ RESPONSE GUIDELINES
 - Use simple punctuation and avoid ALL CAPS (harder to read)
 - Add warm touches: emoji sparingly (😊, ❤️, ☀️), or text expressions like "(smiles)"
 - End with a gentle question or invitation when appropriate to keep conversation going
-- If unsure about something medical or serious, always suggest talking to family or a doctor
+- For minor everyday ailments (like an upset stomach or mild cold), you can share safe, common home remedies or general wellness tips (e.g., staying hydrated, eating bland foods), but ALWAYS kindly remind them that you are not a doctor and they should consult a professional if symptoms persist.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 THINGS TO AVOID
@@ -114,7 +114,7 @@ THINGS TO AVOID
 
 ❌ Never be condescending or talk to them like a child
 ❌ Never dismiss their concerns or feelings
-❌ Never provide medical advice (suggest seeing a doctor instead)
+❌ Never provide professional medical diagnoses or prescribe medications. (You may suggest common, safe home remedies for minor issues, but always include a gentle disclaimer.)
 ❌ Never make them feel like a burden or nuisance
 ❌ Never rush them or show impatience
 ❌ Never use complex jargon or technical terms
@@ -172,7 +172,16 @@ CURRENT CONTEXT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Current Time: ${currentTime.format('dddd, MMMM D, YYYY h:mm A')}
-${timeContext}${routineContext}${moodContext}${interactionContext}`;
+${timeContext}${routineContext}${moodContext}${interactionContext}
+
+IMPORTANT: You must respond in a valid JSON format only, like this:
+{
+  "mood": "happy|sad|anxious|lonely|neutral|excited",
+  "message": "Your warm, empathetic response here",
+  "should_follow_up": true|false,
+  "sentiment_score": -1.0 to 1.0
+}
+Remember to always stay in character as ${COMPANION_NAME}.`;
 }
 
 /**
@@ -220,22 +229,36 @@ export function generateProactivePrompt(
  */
 export function analyzeMoodIndicators(message: string): string | undefined {
     const lowercaseMsg = message.toLowerCase();
+    const isNegated = lowercaseMsg.includes('not ') || lowercaseMsg.includes("n't ") || lowercaseMsg.includes('no ');
 
-    // Sad indicators
-    const sadWords = ['sad', 'lonely', 'miss', 'depressed', 'unhappy', 'crying', 'tears', 'alone', 'nobody', 'left me'];
+    // Sad/Depressed/Bad indicators (Priority)
+    const sadWords = ['sad', 'lonely', 'miss', 'depressed', 'unhappy', 'crying', 'tears', 'alone', 'nobody', 'left me', 'blue', 'gloomy', 'miserable', 'heartbroken', 'hopeless', 'bad', 'sick', 'not well', 'not feeling', 'hurting'];
     if (sadWords.some(word => lowercaseMsg.includes(word))) return 'sad';
 
-    // Anxious indicators
-    const anxiousWords = ['worried', 'anxious', 'scared', 'afraid', 'nervous', 'can\'t sleep', 'stress', 'panic'];
+    // Negated Happy = Sad
+    if (isNegated && (lowercaseMsg.includes('good') || lowercaseMsg.includes('happy') || lowercaseMsg.includes('well') || lowercaseMsg.includes('okay'))) {
+        return 'sad';
+    }
+
+    // Anxious/Worried indicators
+    const anxiousWords = ['worried', 'anxious', 'scared', 'afraid', 'nervous', "can't sleep", 'stress', 'panic', 'jittery', 'uneasy', 'fear', 'tension', 'overwhelmed'];
     if (anxiousWords.some(word => lowercaseMsg.includes(word))) return 'anxious';
 
-    // Happy indicators
-    const happyWords = ['happy', 'wonderful', 'great', 'love', 'joy', 'blessed', 'grateful', 'excited', 'amazing'];
-    if (happyWords.some(word => lowercaseMsg.includes(word))) return 'happy';
+    // Happy/Positive indicators
+    const happyWords = ['happy', 'wonderful', 'great', 'love', 'joy', 'blessed', 'grateful', 'excited', 'amazing', 'good', 'excellent', 'fantastic', 'delighted', 'pleased', 'cheerful'];
+    if (!isNegated && happyWords.some(word => lowercaseMsg.includes(word))) return 'happy';
 
-    // Lonely indicators
-    const lonelyWords = ['no one visits', 'nobody calls', 'all alone', 'forgotten', 'miss my', 'wish someone'];
+    // Lonely/Social isolation indicators
+    const lonelyWords = ['no one visits', 'nobody calls', 'all alone', 'forgotten', 'miss my', 'wish someone', 'quiet here', 'empty house', 'long day'];
     if (lonelyWords.some(word => lowercaseMsg.includes(word))) return 'lonely';
+
+    // Frustrated/Angry indicators
+    const frustratedWords = ['frustrated', 'annoyed', 'angry', 'mad', 'upset', 'tired of', "don't like", 'bad', 'horrible', 'hate', 'frasteted', 'frustrating'];
+    if (frustratedWords.some(word => lowercaseMsg.includes(word))) return 'frustrated';
+
+    // Pain/Physical distress indicators
+    const painWords = ['hurts', 'pain', 'ache', 'sore', 'ouch', 'uncomfortable', 'cramp', 'stiff', 'burning', 'heavy'];
+    if (painWords.some(word => lowercaseMsg.includes(word))) return 'pain';
 
     return undefined;
 }

@@ -8,10 +8,8 @@ import { authenticate } from '../middleware/auth.middleware';
 import { signupLimiter, loginLimiter, otpLimiter } from '../middleware/rateLimiter';
 import {
     handleValidationErrors,
-    elderSignupStep1Validators,
-    elderSignupStep2Validators,
-    elderSignupStep3Validators,
-    elderSignupStep4Validators,
+    initiateFamilyVerificationValidators,
+    completeElderSignupValidators,
     familySignupValidators,
     phoneLoginValidators,
     phoneLoginVerifyValidators,
@@ -27,57 +25,30 @@ const router = Router();
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
- * @route   POST /api/auth/elder/signup/step1
- * @desc    Initiate elder signup with phone number
+ * @route   POST /api/auth/elder/initiate-family-verification
+ * @desc    Initiate elder signup by requesting family verification
  * @access  Public
  */
 router.post(
-    '/elder/signup/step1',
+    '/elder/initiate-family-verification',
     signupLimiter,
     otpLimiter,
-    elderSignupStep1Validators,
+    initiateFamilyVerificationValidators,
     handleValidationErrors,
-    authController.elderSignupStep1
+    authController.initiateFamilyVerification
 );
 
 /**
- * @route   POST /api/auth/elder/signup/step2
- * @desc    Verify elder's phone with OTP
+ * @route   POST /api/auth/elder/complete-signup
+ * @desc    Complete elder signup after family verification
  * @access  Public
  */
 router.post(
-    '/elder/signup/step2',
+    '/elder/complete-signup',
     signupLimiter,
-    elderSignupStep2Validators,
+    completeElderSignupValidators,
     handleValidationErrors,
-    authController.elderSignupStep2
-);
-
-/**
- * @route   POST /api/auth/elder/signup/step3
- * @desc    Elder provides info and family member phone
- * @access  Public
- */
-router.post(
-    '/elder/signup/step3',
-    signupLimiter,
-    otpLimiter,
-    elderSignupStep3Validators,
-    handleValidationErrors,
-    authController.elderSignupStep3
-);
-
-/**
- * @route   POST /api/auth/elder/signup/step4
- * @desc    Family verifies OTP, elder account created
- * @access  Public
- */
-router.post(
-    '/elder/signup/step4',
-    signupLimiter,
-    elderSignupStep4Validators,
-    handleValidationErrors,
-    authController.elderSignupStep4
+    authController.completeElderSignup
 );
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

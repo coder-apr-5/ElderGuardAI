@@ -1,0 +1,4 @@
+≡ƒÜÇ Testing Gemini API with gemini-2.5-flash...
+Γ£à Response: {
+  "message": "Hello!"
+}

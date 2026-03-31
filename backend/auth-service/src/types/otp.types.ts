@@ -15,7 +15,8 @@ export type OTPPurpose = 'login' | 'signup' | 'family-verification' | 'password-
  */
 export interface OTPDocument {
     id: string;
-    phone: string;              // E.164 format
+    phone?: string;             // E.164 format
+    email?: string;             // For email OTP
     otp: string;                // 6-digit code (hashed)
     purpose: OTPPurpose;
     createdAt: Timestamp;
@@ -40,7 +41,8 @@ export interface OTPMetadata {
  * OTP rate limit tracking
  */
 export interface OTPRateLimit {
-    phone: string;
+    phone?: string;
+    email?: string;
     requestCount: number;
     windowStart: Timestamp;
     windowEnd: Timestamp;

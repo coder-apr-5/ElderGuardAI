@@ -495,14 +495,28 @@ export const AICompanionChat: React.FC<AICompanionChatProps> = ({
         /* Quick Responses */
         .quick-responses {
           display: flex;
+          align-items: center;
           gap: 8px;
-          padding: 12px 20px;
+          padding: 12px 20px 16px 20px; /* Extra bottom padding for scrollbar */
           overflow-x: auto;
           background: white;
           border-top: 1px solid #e2e8f0;
         }
 
+        /* Hide scrollbar for a cleaner look but still allow scrolling */
+        .quick-responses::-webkit-scrollbar {
+          height: 6px;
+        }
+        .quick-responses::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .quick-responses::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 4px;
+        }
+
         .quick-response-btn {
+          flex-shrink: 0;
           padding: 10px 16px;
           background: #f1f5f9;
           border: 2px solid #e2e8f0;

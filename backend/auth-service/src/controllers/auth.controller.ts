@@ -17,77 +17,21 @@ function getMetadata(req: Request) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Elder Signup
+// Elder Signup (Controlled Flow)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /**
- * Elder signup step 1 - Initiate with phone
- * POST /api/auth/elder/signup/step1
+ * Initiate elder signup by requesting family verification via email
+ * POST /api/auth/elder/initiate-family-verification
  */
-export async function elderSignupStep1(req: Request, res: Response): Promise<void> {
+export async function initiateFamilyVerification(req: Request, res: Response): Promise<void> {
     try {
-        const { phone, countryCode } = req.body;
-        const result = await authService.elderSignupStep1(phone, countryCode, getMetadata(req));
-
-        if (!result.success) {
-            res.status(400).json(result);
-            return;
-        }
-
-        res.json(result);
-    } catch (error) {
-        logger.error('Elder signup step 1 error', { error });
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-}
-
-/**
- * Elder signup step 2 - Verify phone OTP
- * POST /api/auth/elder/signup/step2
- */
-export async function elderSignupStep2(req: Request, res: Response): Promise<void> {
-    try {
-        const { phone, countryCode, otp } = req.body;
-        const result = await authService.elderSignupStep2(phone, countryCode, otp);
-
-        if (!result.success) {
-            res.status(400).json(result);
-            return;
-        }
-
-        res.json(result);
-    } catch (error) {
-        logger.error('Elder signup step 2 error', { error });
-        res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-}
-
-/**
- * Elder signup step 3 - Provide info and family phone
- * POST /api/auth/elder/signup/step3
- */
-export async function elderSignupStep3(req: Request, res: Response): Promise<void> {
-    try {
-        const {
-            phone,
-            countryCode,
-            fullName,
-            age,
-            familyPhone,
-            familyCountryCode,
+        const { elderName, familyEmail, familyRelation } = req.body;
+        
+        const result = await authService.initiateFamilyVerification(
+            elderName,
+            familyEmail,
             familyRelation,
-            verificationToken,
-        } = req.body;
-
-        const result = await authService.elderSignupStep3(
-            phone,
-            countryCode,
-            fullName,
-            parseInt(age, 10),
-            familyPhone,
-            familyCountryCode,
-            familyRelation,
-            verificationToken,
             getMetadata(req)
         );
 
@@ -98,28 +42,34 @@ export async function elderSignupStep3(req: Request, res: Response): Promise<voi
 
         res.json(result);
     } catch (error) {
-        logger.error('Elder signup step 3 error', { error });
+        logger.error('Initiate family verification error', { error });
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 }
 
 /**
- * Elder signup step 4 - Family verifies, account created
- * POST /api/auth/elder/signup/step4
+ * Complete elder signup after family confirms OTP
+ * POST /api/auth/elder/complete-signup
  */
-export async function elderSignupStep4(req: Request, res: Response): Promise<void> {
+export async function completeElderSignup(req: Request, res: Response): Promise<void> {
     try {
-        const { pendingConnectionId, otp } = req.body;
-        const result = await authService.elderSignupStep4(pendingConnectionId, otp, getMetadata(req));
+        const { pendingId, otp, elderData } = req.body;
+        
+        const result = await authService.completeElderSignup(
+            pendingId,
+            otp,
+            elderData,
+            getMetadata(req)
+        );
 
         if (!result.success) {
-            res.status(400).json({ success: false, message: result.message });
+            res.status(400).json({ success: false, message: (result as any).message || 'Signup failed' });
             return;
         }
 
         res.json(result);
     } catch (error) {
-        logger.error('Elder signup step 4 error', { error });
+        logger.error('Complete elder signup error', { error });
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 }
@@ -312,10 +262,8 @@ export async function getCurrentUser(req: Request, res: Response): Promise<void>
 }
 
 export default {
-    elderSignupStep1,
-    elderSignupStep2,
-    elderSignupStep3,
-    elderSignupStep4,
+    initiateFamilyVerification,
+    completeElderSignup,
     familySignup,
     phoneLoginStep1,
     phoneLoginStep2,

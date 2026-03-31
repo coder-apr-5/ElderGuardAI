@@ -6,7 +6,7 @@ import logging
 import json
 from typing import Dict, Optional, List
 from openai import OpenAI
-from elevenlabs import ElevenLabs
+from elevenlabs.client import ElevenLabs
 import aiofiles
 
 logger = logging.getLogger(__name__)

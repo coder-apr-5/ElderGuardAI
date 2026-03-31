@@ -70,7 +70,7 @@ export interface PendingConnection {
     elderPhone: string;         // E.164 format
     elderName: string;
     elderAge?: number;
-    familyPhone: string;        // E.164 format
+    familyEmail: string;        // Family member's email
     familyRelation: FamilyRelation;
     otpId?: string;             // Reference to OTP document
     status: 'pending' | 'verified' | 'expired' | 'cancelled';
@@ -85,14 +85,13 @@ export interface PendingConnection {
  * Signup request for elders
  */
 export interface ElderSignupRequest {
-    phone: string;
-    countryCode: string;
     fullName: string;
+    email: string;             // Elder's account email
+    password: string;
     age: number;
     dateOfBirth?: string;
     emergencyContact?: string;
-    familyPhone: string;
-    familyCountryCode: string;
+    familyEmail: string;        // Family member's email
     familyRelation: FamilyRelation;
 }
 

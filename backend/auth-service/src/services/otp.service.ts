@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { getDb, Collections } from '../config/firebase';
 import { sendSMS, formatOTPMessage } from '../config/twilio';
+import { sendVerificationEmail } from '../config/mail';
 import { logger, logSecurityEvent } from '../utils/logger';
 import type { OTPDocument, OTPSendResult, OTPVerifyResult, OTPPurpose, OTPMetadata } from '../types';
 import admin from 'firebase-admin';
@@ -39,9 +40,14 @@ function getOTPExpiry(): Date {
 /**
  * Check rate limit for OTP requests
  */
-async function checkRateLimit(phone: string): Promise<{ allowed: boolean; retryAfter?: number }> {
+async function checkRateLimit(identifier: string, type: 'phone' | 'email'): Promise<{ allowed: boolean; retryAfter?: number }> {
+    if (!identifier || identifier.trim() === '') {
+        logger.warn(`Skipping rate limiting: missing ${type} identifier`);
+        return { allowed: true };
+    }
+
     const db = getDb();
-    const rateLimitRef = db.collection(Collections.OTP_RATE_LIMITS).doc(phone);
+    const rateLimitRef = db.collection(Collections.OTP_RATE_LIMITS).doc(identifier);
     const rateDoc = await rateLimitRef.get();
 
     const maxAttempts = parseInt(process.env.OTP_MAX_ATTEMPTS || '3', 10);
@@ -51,7 +57,7 @@ async function checkRateLimit(phone: string): Promise<{ allowed: boolean; retryA
     if (!rateDoc.exists) {
         // First request, create rate limit doc
         await rateLimitRef.set({
-            phone,
+            [type]: identifier,
             requestCount: 1,
             windowStart: Timestamp.fromDate(now),
             windowEnd: Timestamp.fromDate(new Date(now.getTime() + windowMs)),
@@ -67,7 +73,7 @@ async function checkRateLimit(phone: string): Promise<{ allowed: boolean; retryA
     if (now > windowEnd) {
         // Reset the window
         await rateLimitRef.set({
-            phone,
+            [type]: identifier,
             requestCount: 1,
             windowStart: Timestamp.fromDate(now),
             windowEnd: Timestamp.fromDate(new Date(now.getTime() + windowMs)),
@@ -87,7 +93,7 @@ async function checkRateLimit(phone: string): Promise<{ allowed: boolean; retryA
         await rateLimitRef.update({ blocked: true });
         const retryAfter = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000);
 
-        logSecurityEvent('OTP_RATE_LIMIT_EXCEEDED', { phone });
+        logSecurityEvent('OTP_RATE_LIMIT_EXCEEDED', { [type]: identifier });
 
         return { allowed: false, retryAfter };
     }
@@ -110,7 +116,7 @@ export async function sendOTP(
     elderName?: string
 ): Promise<OTPSendResult> {
     // Check rate limit
-    const rateCheck = await checkRateLimit(phone);
+    const rateCheck = await checkRateLimit(phone, 'phone');
     if (!rateCheck.allowed) {
         return {
             success: false,
@@ -171,20 +177,90 @@ export async function sendOTP(
 }
 
 /**
+ * Send OTP to email
+ */
+export async function sendEmailOTP(
+    email: string,
+    purpose: OTPPurpose,
+    metadata: OTPMetadata = {},
+    elderName: string = 'A loved one',
+    relation: string = 'family member'
+): Promise<OTPSendResult> {
+    // Check rate limit
+    const rateCheck = await checkRateLimit(email, 'email');
+    if (!rateCheck.allowed) {
+        return {
+            success: false,
+            message: `Too many OTP requests. Please try again in ${Math.ceil(rateCheck.retryAfter! / 60)} minutes.`,
+            retryAfter: rateCheck.retryAfter,
+        };
+    }
+
+    const db = getDb();
+    const otp = generateOTP();
+    const otpId = uuidv4();
+    const now = new Date();
+    const expiresAt = getOTPExpiry();
+
+    // Store OTP (hashed)
+    const otpDoc: OTPDocument = {
+        id: otpId,
+        email,
+        otp: hashOTP(otp),
+        purpose,
+        createdAt: Timestamp.fromDate(now),
+        expiresAt: Timestamp.fromDate(expiresAt),
+        verified: false,
+        attempts: 0,
+        maxAttempts: 3,
+        metadata: {
+            ...metadata,
+        },
+    };
+
+    await db.collection(Collections.OTPS).doc(otpId).set(otpDoc);
+
+    // Send Email
+    const emailResult = await sendVerificationEmail(email, otp, elderName, relation);
+
+    if (!emailResult.success) {
+        await db.collection(Collections.OTPS).doc(otpId).delete();
+        return {
+            success: false,
+            message: 'Failed to send verification email. Please try again.',
+        };
+    }
+
+    logger.info('Email OTP sent successfully', { email, purpose, otpId });
+
+    return {
+        success: true,
+        message: 'Verification code sent to email',
+        otpId,
+        expiresAt,
+        remainingAttempts: 3,
+    };
+}
+
+/**
  * Verify OTP
  */
 export async function verifyOTP(
-    phone: string,
+    identifier: string,
     otp: string,
     purpose: OTPPurpose
 ): Promise<OTPVerifyResult> {
     const db = getDb();
     const now = new Date();
 
-    // Find the latest unexpired, unverified OTP for this phone and purpose
+    // Check if identifier is email or phone
+    const isEmail = identifier.includes('@');
+    const field = isEmail ? 'email' : 'phone';
+
+    // Find the latest unexpired, unverified OTP for this identifier and purpose
     const otpsQuery = await db
         .collection(Collections.OTPS)
-        .where('phone', '==', phone)
+        .where(field, '==', identifier)
         .where('purpose', '==', purpose)
         .where('verified', '==', false)
         .orderBy('createdAt', 'desc')
@@ -211,7 +287,7 @@ export async function verifyOTP(
 
     // Check max attempts
     if (otpData.attempts >= otpData.maxAttempts) {
-        logSecurityEvent('OTP_MAX_ATTEMPTS_EXCEEDED', { phone, otpId: otpData.id });
+        logSecurityEvent('OTP_MAX_ATTEMPTS_EXCEEDED', { [field]: identifier, otpId: otpData.id });
 
         return {
             success: false,
@@ -230,7 +306,7 @@ export async function verifyOTP(
 
         const remainingAttempts = otpData.maxAttempts - newAttempts;
 
-        logger.warn('OTP verification failed', { phone, attempts: newAttempts });
+        logger.warn('OTP verification failed', { [field]: identifier, attempts: newAttempts });
 
         return {
             success: false,
@@ -245,13 +321,13 @@ export async function verifyOTP(
         verifiedAt: Timestamp.fromDate(now),
     });
 
-    logger.info('OTP verified successfully', { phone, purpose, otpId: otpData.id });
+    logger.info('OTP verified successfully', { [field]: identifier, purpose, otpId: otpData.id });
 
     return {
         success: true,
         message: 'Verification successful',
         otpId: otpData.id,
-        phone,
+        [field]: identifier,
         purpose,
     };
 }

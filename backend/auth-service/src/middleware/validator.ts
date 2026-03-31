@@ -182,17 +182,18 @@ export const validateRefreshToken: ValidationChain[] = [
 ];
 
 // Combined validators for different endpoints
-export const elderSignupStep1Validators = [...validatePhone];
-export const elderSignupStep2Validators = [...validatePhone, ...validateOTP];
-export const elderSignupStep3Validators = [
-    ...validatePhone,
-    ...validateName,
-    ...validateAge,
-    body('familyPhone').trim().notEmpty().withMessage('Family phone is required'),
-    body('familyCountryCode').trim().notEmpty().withMessage('Family country code is required').toUpperCase(),
-    ...validateFamilyRelation,
+export const initiateFamilyVerificationValidators = [
+    body('elderName').trim().notEmpty().withMessage('Elder name is required').isLength({ min: 2, max: 100 }),
+    body('familyEmail').trim().notEmpty().withMessage('Family email is required').isEmail().withMessage('Invalid email format'),
+    body('familyRelation').trim().notEmpty().isIn(['son', 'daughter', 'spouse', 'caregiver', 'sibling', 'grandchild', 'other']).withMessage('Invalid family relation'),
 ];
-export const elderSignupStep4Validators = [...validatePendingId, ...validateOTP];
+
+export const completeElderSignupValidators = [
+    body('pendingId').trim().notEmpty().withMessage('Pending ID is required').isUUID().withMessage('Invalid pending ID'),
+    body('otp').trim().notEmpty().withMessage('OTP is required').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+    body('elderData').isObject().withMessage('Elder data is required'),
+];
+
 export const familySignupValidators = [...validateEmail, ...validatePassword, ...validateName];
 export const phoneLoginValidators = [...validatePhone];
 export const phoneLoginVerifyValidators = [...validatePhone, ...validateOTP];
@@ -213,10 +214,8 @@ export default {
     validatePendingId,
     validateGoogleToken,
     validateRefreshToken,
-    elderSignupStep1Validators,
-    elderSignupStep2Validators,
-    elderSignupStep3Validators,
-    elderSignupStep4Validators,
+    initiateFamilyVerificationValidators,
+    completeElderSignupValidators,
     familySignupValidators,
     phoneLoginValidators,
     phoneLoginVerifyValidators,
