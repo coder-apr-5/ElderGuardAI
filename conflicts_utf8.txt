@@ -1,0 +1,6 @@
+packages/elder-app/src/features/camera/CameraMonitor.tsx
+packages/elder-app/src/pages/HomePage.tsx
+packages/elder-app/src/pages/elder/ProfilePage.tsx
+packages/elder-app/src/pages/family/ConnectElderPage.tsx
+packages/family-dashboard/src/hooks/useMedications.ts
+packages/family-dashboard/src/pages/MedicationsPage.tsx
