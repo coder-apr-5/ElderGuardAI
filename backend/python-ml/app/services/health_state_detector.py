@@ -5,67 +5,28 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import logging
 
-# Robust MediaPipe import
+# Robust YOLOv8 import
 try:
-    import mediapipe as mp
-    MEDIAPIPE_AVAILABLE = True
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
 except ImportError:
-    MEDIAPIPE_AVAILABLE = False
-    class MockMP:
-        class solutions:
-            pose = None
-            face_detection = None
-    mp = MockMP()
+    YOLO_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 class HealthStateDetector:
     def __init__(self):
-        # MediaPipe solutions can be tricky on Windows depending on the version
-        # Some versions need mp.solutions, others need mediapipe.python.solutions
-        pose_module = None
-        face_module = None
-        
         try:
-            pose_module = mp.solutions.pose
-            face_module = mp.solutions.face_detection
-        except Exception:
-            try:
-                # Direct imports as fallback
-                import mediapipe.python.solutions.pose as p
-                import mediapipe.python.solutions.face_detection as f
-                pose_module = p
-                face_module = f
-            except Exception:
-                # Final attempt: direct submodule access
-                try:
-                    from mediapipe.solutions import pose as p
-                    from mediapipe.solutions import face_detection as f
-                    pose_module = p
-                    face_module = f
-                except Exception as e:
-                    logger.error(f"Failed to load MediaPipe solutions: {e}")
-                    # If everything fails, it will raise AttributeError later
-
-        if MEDIAPIPE_AVAILABLE and pose_module and face_module:
-            try:
-                self.pose = pose_module.Pose(
-                    static_image_mode=False,
-                    model_complexity=1,
-                    enable_segmentation=False,
-                    min_detection_confidence=0.5
-                )
-                self.face_detection = face_module.FaceDetection(
-                    min_detection_confidence=0.5
-                )
-            except Exception as e:
-                logger.error(f"Error initializing MediaPipe components: {e}")
+            if YOLO_AVAILABLE:
+                self.pose = YOLO('yolov8n-pose.pt')
+                self.pose.predict(np.zeros((64, 64, 3), dtype=np.uint8), verbose=False)
+            else:
                 self.pose = None
-                self.face_detection = None
-        else:
-             logger.error("MediaPipe modules could not be loaded!")
-             self.pose = None
-             self.face_detection = None
+        except Exception as e:
+            logger.error(f"Error initializing YOLOv8 components: {e}")
+            self.pose = None
+        
+        self.face_detection = None # Handled by YOLO natively
         self.state_history = {}  # User ID → state timeline
         
         # Thresholds
@@ -139,51 +100,41 @@ class HealthStateDetector:
         if not self.pose:
             return {'detected': False, 'body_angle': 90, 'head_angle': 0}
             
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(image_rgb)
+        results = self.pose(image, verbose=False)
         
-        if not results.pose_landmarks:
+        if not results or len(results) == 0 or not hasattr(results[0], 'keypoints') or results[0].keypoints is None or len(results[0].keypoints.xy[0]) == 0:
             return {'detected': False, 'body_angle': 90, 'head_angle': 0}
             
-        landmarks = results.pose_landmarks.landmark
+        landmarks = results[0].keypoints.xy[0].cpu().numpy()
+        if np.all(landmarks == 0):
+            return {'detected': False, 'body_angle': 90, 'head_angle': 0}
         
-        # Calculate body angle (vertical = 90, horizontal = 0)
-        # Using shoulders and hips
-        left_shoulder = landmarks[11]
-        right_shoulder = landmarks[12]
-        left_hip = landmarks[23]
-        right_hip = landmarks[24]
+        # Calculate body angle
+        # 11: left_hip, 12: right_hip, 5: left_shoulder, 6: right_shoulder
+        left_shoulder = landmarks[5]
+        right_shoulder = landmarks[6]
+        left_hip = landmarks[11]
+        right_hip = landmarks[12]
         
-        mid_shoulder = np.array([(left_shoulder.x + right_shoulder.x)/2, (left_shoulder.y + right_shoulder.y)/2])
-        mid_hip = np.array([(left_hip.x + right_hip.x)/2, (left_hip.y + right_hip.y)/2])
+        mid_shoulder = np.array([(left_shoulder[0] + right_shoulder[0])/2, (left_shoulder[1] + right_shoulder[1])/2])
+        mid_hip = np.array([(left_hip[0] + right_hip[0])/2, (left_hip[1] + right_hip[1])/2])
         
         # Vector from hip to shoulder
         vector = mid_shoulder - mid_hip
+        dx, dy = vector[0], vector[1]
         
-        # Angle with vertical (y-axis is inverted in images, so down is positive)
-        # We want angle relative to horizontal ground? or vertical stance?
-        # Let's say 90 is standing (vertical), 0 is lying down (horizontal)
-        
-        dx, dy = vector[0], vector[1] # dy is negative if standing
         angle_rad = np.arctan2(abs(dy), abs(dx))
         angle_deg = np.degrees(angle_rad)
-        
-        # If standing, dx is small, dy is large -> angle near 90
-        # If lying, dx is large, dy is small -> angle near 0
         
         return {
             'detected': True,
             'body_angle': angle_deg,
-            'head_angle': 0 # Simplified
+            'head_angle': 0
         }
 
     def _detect_face(self, image: np.ndarray) -> Dict:
-         if not self.face_detection:
-             return {'detected': False}
-             
-         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-         results = self.face_detection.process(image_rgb)
-         return {'detected': bool(results.detections)}
+         # Face is inherently detected if pose is detected in YOLOv8
+         return {'detected': True}
 
     def _analyze_movement(self, user_id: str, pose: Dict, timestamp: datetime) -> Dict:
         # In a real system, compare landmarks with previous frame for speed

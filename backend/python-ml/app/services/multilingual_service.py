@@ -107,11 +107,13 @@ class MultilingualAssistant:
         Transcribe audio using Whisper API
         """
         try:
-            # Decode base64 audio
+            # Decode base64 audio (strip data URI prefix if present)
+            if ',' in audio_base64:
+                audio_base64 = audio_base64.split(',')[1]
             audio_bytes = base64.b64decode(audio_base64)
             
             # Save to temporary file (Whisper requires file input)
-            temp_filename = f"audio_{uuid.uuid4()}.wav"
+            temp_filename = f"audio_{uuid.uuid4()}.webm"
             
             # Use async file write or standard write
             with open(temp_filename, 'wb') as f:
@@ -222,10 +224,10 @@ class MultilingualAssistant:
         
         try:
             # Generate audio
-            audio_generator = self.elevenlabs_client.generate(
+            audio_generator = self.elevenlabs_client.text_to_speech.convert(
                 text=text,
-                voice=voice_id,
-                model="eleven_multilingual_v2"
+                voice_id=voice_id,
+                model_id="eleven_multilingual_v2"
             )
             
             # Output is a generator of bytes, combine them

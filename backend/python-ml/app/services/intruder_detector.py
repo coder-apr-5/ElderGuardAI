@@ -1,12 +1,11 @@
 try:
-    import face_recognition
+    from deepface import DeepFace
     FACE_REC_AVAILABLE = True
 except ImportError:
     FACE_REC_AVAILABLE = False
 import numpy as np
 import base64
 import cv2
-import mediapipe as mp
 import logging
 import uuid
 from datetime import datetime
@@ -17,29 +16,18 @@ logger = logging.getLogger(__name__)
 
 class IntruderDetector:
     def __init__(self):
-        # MediaPipe Pose for behavior analysis - robust loading
-        pose_module = None
+        # YOLOv8 Pose for behavior analysis - robust loading
         try:
-            pose_module = mp.solutions.pose
-        except Exception:
-            try:
-                import mediapipe.python.solutions.pose as p
-                pose_module = p
-            except Exception:
-                try:
-                    from mediapipe.solutions import pose as p
-                    pose_module = p
-                except Exception as e:
-                    logger.error(f"IntruderDetector: Failed to load MediaPipe Pose: {e}")
-
-        if pose_module:
-            self.pose_detector = pose_module.Pose()
-        else:
+            from ultralytics import YOLO
+            self.pose_detector = YOLO('yolov8n-pose.pt')
+            # Initialize with empty run to load weights
+            self.pose_detector.predict(np.zeros((64, 64, 3), dtype=np.uint8), verbose=False)
+        except Exception as e:
             self.pose_detector = None
-            logger.error("IntruderDetector: MediaPipe Pose module NOT available.")
+            logger.error(f"IntruderDetector: YOLO Pose module NOT available: {e}")
         
         # Thresholds
-        self.FACE_MATCH_THRESHOLD = 0.6  # Lower = stricter
+        self.FACE_MATCH_THRESHOLD = 0.4  # Lower = stricter (Cosine distance)
         self.ALERT_COOLDOWN = 300  # 5 minutes
         
         # Mock database for known faces (In prod, load from Firestore/SQL)
@@ -48,7 +36,7 @@ class IntruderDetector:
         self.last_sync_time = {}
         
         if not FACE_REC_AVAILABLE:
-            logger.warning("IntruderDetector: face_recognition not available. Running in MOCK mode.")
+            logger.warning("IntruderDetector: DeepFace not available. Running in MOCK mode.")
 
     async def _sync_and_get_known_faces(self, user_id: str):
         """Sync familiar faces from Firestore every 60 seconds."""
@@ -89,17 +77,20 @@ class IntruderDetector:
         if image is None:
              return self._get_empty_result(timestamp)
 
-        # 1. Detect faces using face_recognition (dlib)
-        # Convert to RGB (face_recognition expects RGB)
+        # 1. Detect faces using DeepFace
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # Detect locations and encodings
         if not FACE_REC_AVAILABLE:
-            logger.debug("Mocking intruder detection (face_recognition unavailable)")
+            logger.debug("Mocking intruder detection (DeepFace unavailable)")
             return self._get_empty_result(timestamp)
 
-        face_locations = face_recognition.face_locations(image_rgb)
-        face_encodings = face_recognition.face_encodings(image_rgb, face_locations)
+        try:
+            # Extract face embeddings for all faces in image
+            face_encodings = DeepFace.represent(img_path=image_rgb, model_name="Facenet", enforce_detection=True)
+            face_locations = [face.get('facial_area', {}) for face in face_encodings]
+        except ValueError:
+            # DeepFace raises ValueError if no face is detected
+            return self._get_empty_result(timestamp)
         
         if len(face_locations) == 0:
             return self._get_empty_result(timestamp)
@@ -121,12 +112,11 @@ class IntruderDetector:
         suspicious_behavior = False
         behavior_type = None
         if unknown_faces_count > 0 and self.pose_detector:
-            # Simple behavior check using Pose
-            pose_results = self.pose_detector.process(image_rgb)
-            if pose_results and pose_results.pose_landmarks:
-                 # Check for "hands raised" or specific postures?
-                 # For now, placeholder
-                 pass 
+            # Simple behavior check using YOLO Pose
+            results = self.pose_detector.predict(image_rgb, verbose=False)
+            if results and len(results) > 0 and hasattr(results[0], 'keypoints') and results[0].keypoints is not None:
+                # Check for "hands raised" or specific postures
+                pass 
         elif unknown_faces_count > 0:
              logger.debug("Skipping pose analysis for intruder (pose_detector not available)")
         # 4. Alert Logic
@@ -163,11 +153,15 @@ class IntruderDetector:
         if image is None: return False
         
         if not FACE_REC_AVAILABLE:
-            logger.error("Cannot enroll face: face_recognition not available.")
+            logger.error("Cannot enroll face: DeepFace not available.")
             return False
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        encodings = face_recognition.face_encodings(image_rgb)
+        try:
+            # Extract embedding
+            encodings = DeepFace.represent(img_path=image_rgb, model_name="Facenet", enforce_detection=True)
+        except ValueError:
+            encodings = []
         
         if len(encodings) > 0:
             if user_id not in self.known_faces_db:
@@ -175,28 +169,39 @@ class IntruderDetector:
             
             person_id = str(uuid.uuid4())
             self.known_faces_db[user_id][person_id] = {
-                'encoding': encodings[0],
+                'encoding': encodings[0]['embedding'],
                 'name': name,
                 'relationship': relation
             }
             return True
         return False
 
-    def _match_face(self, encoding, known_faces):
+    def _match_face(self, encoding_data, known_faces):
         if not known_faces:
              return None
              
-        # known_faces is dict of person_id -> data
-        known_encodings = [data['encoding'] for data in known_faces.values()]
-        
         if not FACE_REC_AVAILABLE: return None
         
-        matches = face_recognition.compare_faces(known_encodings, encoding, tolerance=self.FACE_MATCH_THRESHOLD)
+        target_embedding = encoding_data.get('embedding', encoding_data)
         
-        if True in matches:
-            first_match_index = matches.index(True)
-            person_id = list(known_faces.keys())[first_match_index]
-            return known_faces[person_id]
+        # Check against all known encodings
+        best_match_id = None
+        best_distance = float('inf')
+        
+        for person_id, data in known_faces.items():
+            known_embedding = data['encoding']
+            
+            # Calculate Cosine Distance
+            a = np.array(target_embedding)
+            b = np.array(known_embedding)
+            distance = 1 - (np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+            
+            if distance < self.FACE_MATCH_THRESHOLD and distance < best_distance:
+                best_distance = distance
+                best_match_id = person_id
+                
+        if best_match_id:
+            return known_faces[best_match_id]
             
         return None
 
