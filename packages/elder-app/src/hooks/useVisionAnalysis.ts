@@ -42,9 +42,9 @@ export const useVisionAnalysis = () => {
         setAnalyzing(true);
         setError(null);
 
-        // Timeout Promise
+        // Timeout Promise (Increased timeout for ML process)
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Request timeout')), 2500)
+            setTimeout(() => reject(new Error('Request timeout')), 8000)
         );
 
         try {
@@ -77,34 +77,9 @@ export const useVisionAnalysis = () => {
             setLastResult(result);
             return result;
         } catch (err: any) {
-            console.warn('Vision analysis failed/timed out, switching to simulation:', err);
-
-            // FALLBACK SIMULATION (For Demo/Dev when backend is offline)
-            const simulatedResult: VisionResult = {
-                timestamp: new Date().toISOString(),
-                emotion: {
-                    emotion: ['Happy', 'Neutral', 'Calm', 'Focused'][Math.floor(Math.random() * 4)],
-                    confidence: 0.85 + (Math.random() * 0.14)
-                },
-                fall: {
-                    fall_detected: false,
-                    confidence: 0.95,
-                    body_angle: Math.floor(Math.random() * 10),
-                    pose_detected: true,
-                    posture: 'Sitting'
-                },
-                health_state: {
-                    state: 'Healthy',
-                    alert_level: 'normal'
-                },
-                security: {
-                    intruder_detected: false
-                },
-                alerts: []
-            };
-
-            setLastResult(simulatedResult);
-            return simulatedResult;
+            console.error('Vision analysis failed:', err);
+            setError(err.message || "Failed to analyze frame");
+            return null;
         } finally {
             setAnalyzing(false);
         }

@@ -11,6 +11,7 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,35 @@ class IntruderDetector:
         # Mock database for known faces (In prod, load from Firestore/SQL)
         # Structure: user_id -> { person_id: { encoding: [...], name: '...', relation: '...' } }
         self.known_faces_db = {} 
+        self.last_sync_time = {}
         
         if not FACE_REC_AVAILABLE:
             logger.warning("IntruderDetector: face_recognition not available. Running in MOCK mode.")
+
+    async def _sync_and_get_known_faces(self, user_id: str):
+        """Sync familiar faces from Firestore every 60 seconds."""
+        now = time.time()
+        last_sync = self.last_sync_time.get(user_id, 0)
+        
+        if now - last_sync > 60:
+            try:
+                from app.services.data_aggregator import data_aggregator
+                profile = await data_aggregator._fetch_user_profile(user_id)
+                manual_members = profile.get('manualFamilyMembers', [])
+                
+                # Re-enroll from fresh profile
+                if manual_members:
+                    self.known_faces_db[user_id] = {} # Clear existing
+                    for member in manual_members:
+                        photo_url = member.get('photoURL')
+                        if photo_url:
+                            self.enroll_face(user_id, member.get('name', 'Unknown'), member.get('relation', 'Family'), photo_url)
+                
+                self.last_sync_time[user_id] = now
+            except Exception as e:
+                logger.error(f"Failed to sync family members for {user_id}: {e}")
+                
+        return self.known_faces_db.get(user_id, {})
 
     async def detect_intruder(
         self,
@@ -78,7 +105,7 @@ class IntruderDetector:
             return self._get_empty_result(timestamp)
             
         # 2. Compare with known faces
-        known_faces = self._get_known_faces(user_id)
+        known_faces = await self._sync_and_get_known_faces(user_id)
         
         unknown_faces_count = 0
         known_people_names = []

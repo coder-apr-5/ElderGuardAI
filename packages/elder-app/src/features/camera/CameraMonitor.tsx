@@ -10,9 +10,8 @@ import {
 import { useVisionAnalysis } from "@/hooks/useVisionAnalysis";
 import { AIInsightsPanel } from "./AIInsightsPanel";
 import { auth, db, type ElderUser, type FamilyMemberManual } from "@elder-nest/shared";
-import { doc, onSnapshot, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, arrayUnion, Timestamp, addDoc, collection, serverTimestamp, getDoc } from "firebase/firestore";
 import { ShieldCheck, ShieldAlert, UserCheck, ScanFace } from "lucide-react";
-
 
 export const CameraMonitor: React.FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -31,6 +30,9 @@ export const CameraMonitor: React.FC = () => {
     const [securityStatus, setSecurityStatus] = useState<'secure' | 'scanning' | 'alert'>('secure');
     const [detectedPerson, setDetectedPerson] = useState<{ name: string; relation: string; photo?: string } | null>(null);
     const [knownFaces, setKnownFaces] = useState<FamilyMemberManual[]>([]);
+    
+    // To prevent spamming fall alerts, remember when we last alerted
+    const lastFallAlertRef = useRef<number>(0);
 
     const { analyzeFrame, analyzing, lastResult } = useVisionAnalysis();
 
@@ -117,9 +119,74 @@ export const CameraMonitor: React.FC = () => {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const imageBase64 = canvas.toDataURL('image/jpeg', 0.6); // Compress slightly
-            await analyzeFrame(imageBase64);
+            const visionResult = await analyzeFrame(imageBase64);
+            
+            // Check for critical alerts (e.g. falls) from the backend
+            if (visionResult?.fall?.fall_detected && auth.currentUser) {
+                const now = Date.now();
+                // Send an alert at most once every 60 seconds to avoid spamming
+                if (now - lastFallAlertRef.current > 60000) {
+                    lastFallAlertRef.current = now;
+                    triggerEmergencyAlert("FALL DETECTED");
+                }
+            }
+
+            // Check for security alerts from the backend (if in security mode)
+            if (mode === 'security' && visionResult?.security) {
+                if (visionResult.security.intruder_detected) {
+                    setSecurityStatus('alert');
+                    setDetectedPerson(null);
+                    sendSecurityAlert("Unauthorized person detected by camera.");
+                    setTimeout(() => setSecurityStatus('secure'), 5000);
+                } else if (visionResult.security.details?.known_people?.length > 0) {
+                    // Match the first known person detected
+                    const matchedName = visionResult.security.details.known_people[0];
+                    const memberInfo = knownFaces.find(m => m.name === matchedName);
+                    setSecurityStatus('secure');
+                    setDetectedPerson({
+                        name: matchedName,
+                        relation: memberInfo?.relation || 'Family',
+                        photo: memberInfo?.photoURL
+                    });
+                    setTimeout(() => setDetectedPerson(null), 5000);
+                } else {
+                    setSecurityStatus('secure');
+                    setDetectedPerson(null);
+                }
+            }
         }
-    }, [isActive, analyzing, analyzeFrame]);
+    }, [isActive, analyzing, analyzeFrame, mode, knownFaces]);
+
+    const triggerEmergencyAlert = async (type: string) => {
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        try {
+            console.error(`🚨 EMERGENCY TRIGGERED: ${type} 🚨`);
+            const elderDoc = await getDoc(doc(db, 'users', user.uid));
+            const elderData = elderDoc.data();
+            const familyIds = elderData?.familyMembers || [];
+
+            await addDoc(collection(db, 'alerts'), {
+                elderId: user.uid,
+                type: 'fall',
+                severity: 'critical',
+                message: `URGENT: Fall detected by AI Camera for ${user.displayName || 'Elder'}!`,
+                timestamp: serverTimestamp(),
+                acknowledged: false,
+                familyIds: familyIds
+            });
+
+            // Set emergency mode in elder user document
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, {
+                isEmergency: true,
+                lastActive: serverTimestamp()
+            });
+        } catch (e) {
+            console.error("Failed to trigger fall emergency alert", e);
+        }
+    };
 
     // Frame processing loop (MOOD MODE)
     useEffect(() => {
@@ -131,48 +198,18 @@ export const CameraMonitor: React.FC = () => {
         return () => clearInterval(interval);
     }, [isActive, mode, captureFrame]);
 
-    // Security/Face Detection Simulation Loop (SECURITY MODE)
+    // Security/Face Detection Loop (SECURITY MODE)
     useEffect(() => {
         let interval: any;
         if (isActive && mode === 'security') {
             interval = setInterval(() => {
-                // Status: Scanning
                 setSecurityStatus('scanning');
-
-                setTimeout(() => {
-                    const rand = Math.random();
-                    // Simulating Detection Logic:
-                    // 0.0 - 0.7: No face/Secure
-                    // 0.7 - 0.95: Known Face
-                    // 0.95 - 1.0: Unknown/Intruder
-
-                    if (rand > 0.7 && rand <= 0.95 && knownFaces.length > 0) {
-                        // Known Family Member
-                        const member = knownFaces[Math.floor(Math.random() * knownFaces.length)];
-                        setSecurityStatus('secure');
-                        setDetectedPerson({
-                            name: member.name,
-                            relation: member.relation || 'Family',
-                            photo: member.photoURL
-                        });
-                        setTimeout(() => setDetectedPerson(null), 5000);
-                    } else if (rand > 0.95) {
-                        // Intruder
-                        setSecurityStatus('alert');
-                        setDetectedPerson(null);
-                        sendSecurityAlert("Unauthorized person detected by camera.");
-                        setTimeout(() => setSecurityStatus('secure'), 5000);
-                    } else {
-                        // Secure / Empty
-                        setSecurityStatus('secure');
-                        setDetectedPerson(null);
-                    }
-                }, 2000); // Scan duration
-
+                // Trigger actual backend frame capture for security
+                captureFrame();
             }, 8000); // Check every 8s
         }
         return () => clearInterval(interval);
-    }, [isActive, mode, knownFaces]);
+    }, [isActive, mode, captureFrame]);
 
     // FPS Counter
     useEffect(() => {
