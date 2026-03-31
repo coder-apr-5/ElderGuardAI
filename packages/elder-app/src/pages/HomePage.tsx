@@ -55,7 +55,7 @@ export const HomePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { auth, db, localUserStore } = await import("@elder-nest/shared");
+        const { auth, db } = await import("@elder-nest/shared");
         const { doc, getDoc } = await import("firebase/firestore");
         const user = auth.currentUser;
         if (!user) return;
@@ -68,7 +68,7 @@ export const HomePage = () => {
           if (snap.exists()) {
             userData = snap.data();
             // Cache locally if Firestore succeeds
-            localUserStore.save({ ...userData, uid: user.uid });
+            localStorage.setItem(`users_${user.uid}`, JSON.stringify({ ...userData, uid: user.uid }));
           }
         } catch (e) {
           console.warn("⚠️ Firestore unavailable on Home, trying Local Store...");
@@ -76,7 +76,11 @@ export const HomePage = () => {
 
         // Fallback to local store if Firestore failed or was empty
         if (!userData) {
-          userData = localUserStore.get(user.uid);
+          try {
+             const localDataStr = localStorage.getItem(`users_${user.uid}`);
+             if (localDataStr) userData = JSON.parse(localDataStr);
+          } catch (e) {}
+
           // Auto-sync back to Firestore so family can find this Elder!
           if (userData && userData.connectionCode) {
              const { setDoc, doc } = await import("firebase/firestore");

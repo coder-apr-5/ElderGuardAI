@@ -125,9 +125,12 @@ export async function generateResponse(
     try {
         const session = getOrCreateSession(context);
 
-        // If AI not configured, return simulated response
+        // If AI not configured, tell the user exactly what is missing
         if (!session) {
-            return generateSimulatedResponse(userMessage, context, 'neutral');
+            return {
+                message: "SYSTEM ERROR: My AI brain is offline! The GEMINI_API_KEY is missing from the environment variables (.env file). Please add it and restart the server so I can act like a normal AI!",
+                mood: 'neutral'
+            };
         }
 
         // Let the AI analyze the mood itself natively
@@ -183,11 +186,26 @@ export async function generateResponse(
         }
     } catch (error: any) {
         console.error('❌ AI response error:', error.message || error);
-        if (error.stack) console.error(error.stack);
         
+        // If the chat session got corrupted by a failed request, delete it so it rebuilds cleanly
+        activeSessions.delete(context.elderId);
+
+        const errorMsg = error.message?.toLowerCase() || '';
+        
+        // If user hit the Google Gemini Rate Limit / Quota
+        if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('rate limit')) {
+            return {
+                message: `Google API Error: I'm deeply sorry, but my Google AI API rate limit has been reached for this minute. I need to take a quick 60-second breather!`,
+                mood: 'sad',
+                shouldFollowUp: false
+            };
+        }
+
+        // Return exact error message so user can see it
         return {
-            message: `Mira is having a little trouble thinking. Please try again! (Error: ${error.message || 'unknown error'})`,
-            mood: 'neutral'
+            message: `SYSTEM ERROR: Instead of generating a response, the Google API threw an error: [${errorMsg || error}]`,
+            mood: 'neutral',
+            shouldFollowUp: false
         };
     }
 }

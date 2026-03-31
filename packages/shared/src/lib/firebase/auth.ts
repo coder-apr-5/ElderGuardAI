@@ -96,22 +96,6 @@ export const signUpFamily = async (data: any) => {
         let eldersConnected: string[] = [];
 
         if (connectionCode) {
-<<<<<<< HEAD
-            try {
-                const cleanCode = connectionCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, where("connectionCode", "==", cleanCode), where("role", "==", "elder"));
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    const elderDoc = querySnapshot.docs[0];
-                    const elderId = elderDoc.id;
-                    eldersConnected.push(elderId);
-
-                    await updateDoc(doc(db, 'users', elderId), {
-                        familyMembers: arrayUnion(user.uid)
-                    });
-=======
             const trimCode = connectionCode.toString().trim().toUpperCase();
             // Find elder locally
             for (let i = 0; i < localStorage.length; i++) {
@@ -134,7 +118,6 @@ export const signUpFamily = async (data: any) => {
                     } catch (e) {
                         console.error("Error parsing user data in signUpFamily", e);
                     }
->>>>>>> 61642f319b9340e6940e13b1c0cf4a6812386504
                 }
             }
         }
