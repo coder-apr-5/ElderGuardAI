@@ -18,7 +18,9 @@ class MultilingualAssistant:
         openai_key = os.getenv('OPENAI_API_KEY')
         
         if groq_key and not groq_key.startswith('gsk_your-'):
-            self.whisper_client = OpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
+            # Store API details for direct HTTP calls to bypass SDK version issues
+            self.groq_key = groq_key
+            self.whisper_client = "GROQ_DIRECT"
             self.stt_model = "whisper-large-v3"
             self.llm_model = "llama3-70b-8192"
         elif openai_key and not openai_key.startswith('sk-your-'):
@@ -119,25 +121,39 @@ class MultilingualAssistant:
             with open(temp_filename, 'wb') as f:
                 f.write(audio_bytes)
             
-            # Call Whisper API
-            with open(temp_filename, 'rb') as audio_file:
-                # Note: OpenAI client is synchronous, for async use AsyncOpenAI or run in executor
-                # For this implementation, we assume standardized synchronous usage or wrap it
-                result = self.whisper_client.audio.transcriptions.create(
-                    model=self.stt_model,
-                    file=audio_file,
-                    language=preferred_language,  # Optional hint
-                    response_format="verbose_json"
-                )
-            
-            # Cleanup
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename)
-            
-            # Parse result (handling different response formats if needed)
-            language = getattr(result, 'language', 'en')
-            text = getattr(result, 'text', '')
-            duration = getattr(result, 'duration', 0.0)
+            import httpx
+            import json
+
+            if self.whisper_client == "GROQ_DIRECT":
+                async with httpx.AsyncClient() as client:
+                    with open(temp_filename, 'rb') as audio_file:
+                        files = {'file': (temp_filename, audio_file, 'audio/webm')}
+                        data = {'model': self.stt_model, 'response_format': 'verbose_json', 'language': preferred_language or 'en'}
+                        headers = {'Authorization': f'Bearer {self.groq_key}'}
+                        response = await client.post(
+                            "https://api.groq.com/openai/v1/audio/transcriptions",
+                            headers=headers,
+                            data=data,
+                            files=files,
+                            timeout=60.0
+                        )
+                        response.raise_for_status()
+                        result_data = response.json()
+                        text = result_data.get('text', '')
+                        language = result_data.get('language', 'en')
+                        duration = result_data.get('duration', 0.0)
+            else:
+                # Fallback to OpenAI SDK (if not Groq)
+                with open(temp_filename, 'rb') as audio_file:
+                    result = self.whisper_client.audio.transcriptions.create(
+                        model=self.stt_model,
+                        file=audio_file,
+                        language=preferred_language,
+                        response_format="verbose_json"
+                    )
+                language = getattr(result, 'language', 'en')
+                text = getattr(result, 'text', '')
+                duration = getattr(result, 'duration', 0.0)
             
             # Calculate confidence from segments if available
             confidence = 1.0
@@ -154,6 +170,8 @@ class MultilingualAssistant:
             
         except Exception as e:
             logger.error(f"Transcription error: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             # Cleanup on error
             if 'temp_filename' in locals() and os.path.exists(temp_filename):
                 os.remove(temp_filename)
@@ -191,14 +209,32 @@ class MultilingualAssistant:
         ]
         
         # Call LLM
-        response = self.whisper_client.chat.completions.create(
-            model=self.llm_model,
-            messages=messages,
-            max_tokens=150,
-            temperature=0.8
-        )
-        
-        return response.choices[0].message.content
+        if self.whisper_client == "GROQ_DIRECT":
+            import httpx
+            async with httpx.AsyncClient() as client:
+                headers = {'Authorization': f'Bearer {self.groq_key}', 'Content-Type': 'application/json'}
+                data = {
+                    'model': self.llm_model,
+                    'messages': messages,
+                    'max_tokens': 150,
+                    'temperature': 0.8
+                }
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=60.0
+                )
+                response.raise_for_status()
+                return response.json()['choices'][0]['message']['content']
+        else:
+            response = self.whisper_client.chat.completions.create(
+                model=self.llm_model,
+                messages=messages,
+                max_tokens=150,
+                temperature=0.8
+            )
+            return response.choices[0].message.content
     
     async def synthesize_speech(
         self,
