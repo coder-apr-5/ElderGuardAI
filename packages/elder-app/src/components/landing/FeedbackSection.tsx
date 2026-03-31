@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, MessageSquare, Star, CheckCircle2, AlertCircle } from 'lucide-react';
-import { db } from '@elder-nest/shared';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Send, Star, CheckCircle2, AlertCircle } from 'lucide-react';
+
 
 export const FeedbackSection = () => {
     const [email, setEmail] = useState('');
@@ -16,13 +15,15 @@ export const FeedbackSection = () => {
 
         setStatus('submitting');
         try {
-            await addDoc(collection(db, 'feedback'), {
+            const feedback = JSON.parse(localStorage.getItem('feedback') || '[]');
+            feedback.push({
                 email,
                 message,
                 rating,
-                timestamp: serverTimestamp(),
+                timestamp: new Date().toISOString(),
                 source: 'landing_page'
             });
+            localStorage.setItem('feedback', JSON.stringify(feedback));
             setStatus('success');
             setMessage('');
             setEmail('');

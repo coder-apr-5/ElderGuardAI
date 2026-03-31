@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase/auth'; // Adjust import path if needed
-import { getFriendlyErrorMessage } from '../utils/errorMessages';
 
 export interface OAuthButtonProps {
     role: 'elder' | 'family';
@@ -22,7 +21,7 @@ const OAuthButton: React.FC<OAuthButtonProps> = ({ role, onSuccess, onError, tex
             onSuccess?.(user);
         } catch (error: any) {
             console.error(error);
-            onError?.(getFriendlyErrorMessage(error.code));
+            onError?.(error.message || "Failed to sign in with Google.");
         } finally {
             setLoading(false);
         }

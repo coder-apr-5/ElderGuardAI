@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Lock, Phone, Check, ChevronRight, ChevronLeft, Users, Shield, Heart } from 'lucide-react';
 import { z } from 'zod';
-import { OAuthButton, signUpFamily, getFriendlyErrorMessage } from '@elder-nest/shared';
+import { OAuthButton, signUpFamily } from '@elder-nest/shared';
 
 // Define schema locally since we're adapting the UI structure
 const familySignupSchema = z.object({
@@ -81,7 +81,7 @@ const FamilySignupPage = () => {
       navigate('/family');
     } catch (err: any) {
       console.error("Signup error:", err);
-      setError(getFriendlyErrorMessage(err.code) || "Signup failed. Please try again.");
+      setError(err.message || "Signup failed. Please try again.");
       setIsLoading(false);
     }
   };

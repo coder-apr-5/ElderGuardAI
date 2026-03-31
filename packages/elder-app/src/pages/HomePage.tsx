@@ -9,7 +9,6 @@ import {
   Moon,
   MessageCircleHeart,
   Pill,
-  CloudSun,
   Phone,
   Stethoscope,
   Heart,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import { CameraMonitor } from "@/features/camera";
 import { RealTimeClock, ClockWidget } from "@/components/ClockWidget";
+import { WeatherWidget } from "@/components/WeatherWidget";
 
 export const HomePage = () => {
   const navigate = useNavigate();
@@ -54,16 +54,15 @@ export const HomePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { auth, db } = await import("@elder-nest/shared");
-        const { doc, getDoc } = await import("firebase/firestore");
+        const { auth } = await import("@elder-nest/shared");
         const user = auth.currentUser;
         if (!user) return;
 
         setUserName(user.displayName?.split(" ")[0] || "Friend");
 
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
+        const dataStr = localStorage.getItem(`users_${user.uid}`);
+        if (dataStr) {
+          const data = JSON.parse(dataStr);
           setConnectionCode(data.connectionCode);
           setEmergencyContact(data.emergencyContact);
           setFamilyMembers(data.manualFamilyMembers || []);
@@ -77,7 +76,6 @@ export const HomePage = () => {
 
   /* ---------------- ACCESSIBILITY ---------------- */
   const [fontSize, setFontSize] = useState<"normal" | "large">("normal");
-  const heading = fontSize === "large" ? "text-4xl" : "text-3xl";
   const cardTitle = fontSize === "large" ? "text-2xl" : "text-xl";
 
   const [showBanner, setShowBanner] = useState(true);
@@ -289,18 +287,9 @@ export const HomePage = () => {
               <motion.div
                 variants={itemVariants}
                 whileHover={{ y: -5 }}
-                className="rounded-3xl p-6 bg-gradient-to-br from-sky-50 to-blue-100 dark:from-sky-900 dark:to-blue-900 border border-blue-100 dark:border-slate-700 shadow-md min-h-[140px] flex flex-col justify-center"
+                className="rounded-3xl p-6 bg-gradient-to-br from-sky-50 to-blue-100 dark:from-sky-900 dark:to-blue-900 border border-blue-100 dark:border-slate-700 shadow-md min-h-[140px]"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sky-800 dark:text-sky-200 font-bold mb-1 uppercase text-xs tracking-wider">Weather</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-slate-800 dark:text-white">72° <span className="text-base text-slate-500 dark:text-slate-300 font-medium">Sunny</span></p>
-                    <p className="text-[10px] text-sky-700 dark:text-sky-300 mt-1 uppercase font-semibold">New York City</p>
-                  </div>
-                  <div className="p-3 bg-white/50 dark:bg-sky-800/50 rounded-2xl text-sky-600 dark:text-sky-100 shadow-sm border border-white/20">
-                    <CloudSun size={32} />
-                  </div>
-                </div>
+                <WeatherWidget />
               </motion.div>
             </div >
 

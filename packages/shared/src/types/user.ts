@@ -1,5 +1,4 @@
-import { Timestamp } from 'firebase/firestore';
-
+// Using string for ISO dates instead of Firestore Timestamp
 export interface FamilyMemberManual {
   name: string;
   relation?: string;
@@ -26,8 +25,8 @@ export interface ElderUser {
   manualFamilyMembers?: FamilyMemberManual[]; // Manually added members
 
   connectionCode: string; // 6-digit code
-  createdAt: Timestamp;
-  lastActive: Timestamp;
+  createdAt: string;
+  lastActive: string;
   profileSetupComplete: boolean;
   role: 'elder';
 }
@@ -48,8 +47,8 @@ export interface FamilyUser {
 
   manualOtherFamilyMembers?: FamilyMemberManual[]; // Other family members added manually
 
-  createdAt: Timestamp;
-  lastLogin: Timestamp;
+  createdAt: string;
+  lastLogin: string;
   role: 'family';
 }
 

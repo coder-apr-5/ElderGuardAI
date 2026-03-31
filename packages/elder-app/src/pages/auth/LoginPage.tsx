@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,8 +9,7 @@ import { z } from 'zod';
 import {
     OAuthButton,
     signInWithEmail,
-    loginSchema,
-    getFriendlyErrorMessage
+    loginSchema
 } from '@elder-nest/shared';
 
 // Infer the type locally from loginSchema
@@ -42,7 +41,7 @@ const LoginPage = () => {
                 navigate('/dashboard');
             }
         } catch (err: any) {
-            setError(getFriendlyErrorMessage(err.code));
+            setError(err.message);
         } finally {
             setIsLoading(false);
         }

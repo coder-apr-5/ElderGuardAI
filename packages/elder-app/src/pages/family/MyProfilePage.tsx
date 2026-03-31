@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Camera, Save, Plus, Trash2, User } from 'lucide-react';
-import { auth, db } from '@elder-nest/shared';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth } from '@elder-nest/shared';
 import type { FamilyUser, FamilyMemberManual } from '@elder-nest/shared';
 
 export const MyProfilePage = () => {
@@ -27,10 +26,9 @@ export const MyProfilePage = () => {
     useEffect(() => {
         const fetchUser = async () => {
             if (auth.currentUser) {
-                const docRef = doc(db, 'users', auth.currentUser.uid);
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    const data = snap.data() as FamilyUser;
+                const dataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+                if (dataStr) {
+                    const data = JSON.parse(dataStr) as FamilyUser;
 
                     setFormData({
                         fullName: data.fullName || '',
@@ -75,8 +73,10 @@ export const MyProfilePage = () => {
         if (!auth.currentUser) return;
         setSaving(true);
         try {
-            const docRef = doc(db, 'users', auth.currentUser.uid);
-            await updateDoc(docRef, {
+            const dataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+            const data = dataStr ? JSON.parse(dataStr) : {};
+            localStorage.setItem(`users_${auth.currentUser.uid}`, JSON.stringify({
+                ...data,
                 fullName: formData.fullName,
                 phone: formData.phoneNumber,
                 address: formData.address,
@@ -86,8 +86,8 @@ export const MyProfilePage = () => {
                 dob: formData.dob,
                 photoURL: formData.photoURL,
                 manualOtherFamilyMembers: familyMembers,
-                updatedAt: new Date()
-            });
+                updatedAt: new Date().toISOString()
+            }));
             alert('Profile updated successfully!');
         } catch (error) {
             console.error("Error updating profile:", error);

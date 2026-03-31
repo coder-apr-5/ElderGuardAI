@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle, ShieldAlert, Bell } from "lucide-react";
 import { useConnectedElders } from "@/hooks/useElderData";
-import { db } from "@elder-nest/shared";
-import { doc, onSnapshot } from "firebase/firestore";
 
 interface Notification {
     id: string;
@@ -21,37 +19,32 @@ export const AlertsPage = () => {
     useEffect(() => {
         if (elders.length === 0) return;
 
-        const unsubscribes: (() => void)[] = [];
-
-        elders.forEach(elder => {
-            const docRef = doc(db, 'users', elder.uid);
-            const unsub = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
+        const fetchAlerts = () => {
+            elders.forEach(elder => {
+                const docStr = localStorage.getItem(`users_${elder.uid}`);
+                if (docStr) {
+                    const data = JSON.parse(docStr);
                     const notifs = (data.notifications || []) as Notification[];
 
-                    // Add elder name and update state
                     const enhancedNotifs = notifs.map(n => ({
                         ...n,
                         elderName: elder.name
                     }));
 
                     setNotifications(prev => {
-                        // Remove old notifs from this elder
                         const others = prev.filter(n => n.elderName !== elder.name);
-                        // Combine and sort by timestamp desc
                         return [...others, ...enhancedNotifs].sort((a, b) =>
-                            (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)
+                            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                         );
                     });
                 }
             });
-            unsubscribes.push(unsub);
-        });
-
-        return () => {
-            unsubscribes.forEach(unsub => unsub());
         };
+
+        fetchAlerts();
+        const interval = setInterval(fetchAlerts, 5000);
+
+        return () => clearInterval(interval);
     }, [elders]);
 
     if (loading) return <div>Loading alerts...</div>;
@@ -89,7 +82,7 @@ export const AlertsPage = () => {
                                             'System Notification'}
 
                                     <span className="text-xs font-normal text-gray-400 ml-auto">
-                                        {notif.elderName} • {notif.timestamp?.toDate ? notif.timestamp.toDate().toLocaleString() : 'Just now'}
+                                        {notif.elderName} • {notif.timestamp ? new Date(notif.timestamp).toLocaleString() : 'Just now'}
                                     </span>
                                 </CardTitle>
                             </CardHeader>

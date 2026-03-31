@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from '../lib/firebase/auth'; // Ensure this path is correct
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase/config';
 import { Loader2 } from 'lucide-react';
 
 export interface ProtectedRouteProps {
@@ -44,17 +42,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
 
             try {
                 // Fetch full user profile
-                const userDocRef = doc(db, 'users', firebaseUser.uid);
-                const userSnap = await getDoc(userDocRef);
+                const dataStr = localStorage.getItem(`users_${firebaseUser.uid}`);
 
-                if (!userSnap.exists()) {
-                    // User authenticated but no DB record? Rare.
+                if (!dataStr) {
+                    // User authenticated but no DB record?
                     console.error("No user document found");
                     navigate('/auth/login');
                     return;
                 }
 
-                const userData = userSnap.data();
+                const userData = JSON.parse(dataStr);
 
                 // 1. Role Check
                 if (allowedRoles && !allowedRoles.includes(userData.role)) {

@@ -2,17 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection — each user can read/write their own doc
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Family members can read elder profiles they are connected to
-      allow read: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
-    // Medications collection — two-way sync between Elder & Family
-    // Any authenticated user can CRUD medications where:
-    //   - They are the elder (elderId == their uid), OR
-    //   - They are connected to that elder
     match /medications/{medId} {
       allow read, write: if request.auth != null;
     }

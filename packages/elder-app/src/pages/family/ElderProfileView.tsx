@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { User, Phone, MapPin, Heart, AlertCircle, Droplet, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { auth, db } from "@elder-nest/shared";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { auth } from "@elder-nest/shared";
 import type { ElderUser, FamilyUser } from "@elder-nest/shared";
 import { useNavigate } from "react-router-dom";
 
@@ -17,12 +16,11 @@ export const ElderProfileView = () => {
         const fetchConnection = async () => {
             if (!auth.currentUser) return;
 
-            // Get Family User Data to find connected Elder ID
-            const familyRef = doc(db, 'users', auth.currentUser.uid);
-            const familySnap = await getDoc(familyRef);
+            // Get Family User Data from localStorage
+            const familyDataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
 
-            if (familySnap.exists()) {
-                const familyData = familySnap.data() as FamilyUser;
+            if (familyDataStr) {
+                const familyData = JSON.parse(familyDataStr) as FamilyUser;
                 const connectedElders = familyData.eldersConnected || [];
 
                 if (connectedElders.length === 0) {
@@ -33,16 +31,19 @@ export const ElderProfileView = () => {
 
                 // Listen to the first connected Elder
                 const elderId = connectedElders[0];
-                const elderRef = doc(db, 'users', elderId);
-
-                const unsubscribe = onSnapshot(elderRef, (doc) => {
-                    if (doc.exists()) {
-                        setElderData(doc.data() as ElderUser);
+                
+                const fetchElder = () => {
+                    const elderDataStr = localStorage.getItem(`users_${elderId}`);
+                    if (elderDataStr) {
+                        setElderData(JSON.parse(elderDataStr) as ElderUser);
                     }
                     setLoading(false);
-                });
+                };
+                
+                fetchElder();
+                const interval = setInterval(fetchElder, 2000);
 
-                return () => unsubscribe();
+                return () => clearInterval(interval);
             } else {
                 setLoading(false);
             }

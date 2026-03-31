@@ -9,9 +9,8 @@ import {
   Pill, Plus, Pencil, Trash2, Clock, AlertTriangle, X, Check, Bell,
   RefreshCw, User2, Users2, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { auth, db } from '@elder-nest/shared';
+import { auth } from '@elder-nest/shared';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useMedications, isStale, daysSinceUpdate } from '@/hooks/useMedications';
 import type { MedicationInput } from '@/hooks/useMedications';
 
@@ -134,14 +133,15 @@ export const MedicineList = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [staleAlert, setStaleAlert] = useState(true);
 
-  // Resolve elder UID on auth change
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) { setElderId(null); return; }
-      const snap = await getDoc(doc(db, 'users', user.uid));
-      const role = snap.data()?.role as string;
-      if (role === 'elder') {
-        setElderId(user.uid);
+      const dataStr = localStorage.getItem(`users_${user.uid}`);
+      if (dataStr) {
+        const data = JSON.parse(dataStr);
+        if (data.role === 'elder') {
+          setElderId(user.uid);
+        }
       }
     });
     return () => unsub();

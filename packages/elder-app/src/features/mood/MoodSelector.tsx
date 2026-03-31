@@ -11,23 +11,24 @@ export const MoodSelector = () => {
     const saveMoodToDB = async (mood: string) => {
         setSaving(true);
         try {
-            const { auth, db } = await import("@elder-nest/shared");
-            const { collection, addDoc, serverTimestamp } = await import("firebase/firestore");
-
+            const { auth } = await import("@elder-nest/shared");
+            
             const user = auth.currentUser;
             if (!user) {
                 console.warn("No user logged in, cannot save mood");
                 return;
             }
 
-            // Save mood to Firestore
-            await addDoc(collection(db, "moods"), {
+            // Save mood to localStorage
+            const moods = JSON.parse(localStorage.getItem('moods') || '[]');
+            moods.push({
                 userId: user.uid,
                 score: mood.toLowerCase().includes('happy') ? 1.0 : mood.toLowerCase().includes('sad') ? 0.0 : 0.5,
                 label: mood,
                 source: 'manual',
-                timestamp: serverTimestamp()
+                timestamp: new Date().toISOString()
             });
+            localStorage.setItem('moods', JSON.stringify(moods));
 
         } catch (error) {
             console.error("Failed to save mood", error);

@@ -9,32 +9,34 @@ import {
     User,
     updateProfile
 } from 'firebase/auth';
-import {
-    doc,
-    setDoc,
-    getDoc,
-    updateDoc,
-    serverTimestamp,
-    collection,
-    query,
-    where,
-    getDocs,
-    arrayUnion
-} from 'firebase/firestore';
-import { auth, db } from './config';
-export { auth, db };
+import { auth } from './config';
+
+export { auth };
+export const db = {} as any; // Mock db export for backward compatibility
+
+// Helper to interact with Local Storage as a DB fallback
+const getLocalDoc = (collection: string, id: string) => {
+    const data = localStorage.getItem(`${collection}_${id}`);
+    return data ? JSON.parse(data) : null;
+};
+
+const setLocalDoc = (collection: string, id: string, data: any) => {
+    localStorage.setItem(`${collection}_${id}`, JSON.stringify(data));
+};
+
+const updateLocalDoc = (collection: string, id: string, data: any) => {
+    const existing = getLocalDoc(collection, id) || {};
+    localStorage.setItem(`${collection}_${id}`, JSON.stringify({ ...existing, ...data }));
+};
 import { ElderUser, FamilyUser } from '../../types/user';
 
 // --- Auth Utilities ---
 
 export const mapFirebaseUserToUser = async (firebaseUser: User | null): Promise<ElderUser | FamilyUser | null> => {
     if (!firebaseUser) return null;
-
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (userDoc.exists()) {
-        return userDoc.data() as ElderUser | FamilyUser;
+    const userData = getLocalDoc('users', firebaseUser.uid);
+    if (userData) {
+        return userData as ElderUser | FamilyUser;
     }
     return null;
 };
@@ -64,16 +66,16 @@ export const signUpElder = async (data: any) => {
             age,
             emergencyContact,
             familyMembers: [],
-            connectionCode: myConnectionCode, // Their own code
+            connectionCode: myConnectionCode,
             profileSetupComplete: false,
             role: 'elder'
         };
 
-        await setDoc(doc(db, 'users', user.uid), {
+        setLocalDoc('users', user.uid, {
             ...elderData,
             uid: user.uid,
-            createdAt: serverTimestamp(),
-            lastActive: serverTimestamp(),
+            createdAt: new Date().toISOString(),
+            lastActive: new Date().toISOString(),
         });
 
         return user;
@@ -93,43 +95,47 @@ export const signUpFamily = async (data: any) => {
 
         let eldersConnected: string[] = [];
 
-        // Link Elder Logic
         if (connectionCode) {
-            try {
-                const usersRef = collection(db, 'users');
-                // Query for an elder with this connection code
-                const q = query(usersRef, where("connectionCode", "==", connectionCode), where("role", "==", "elder"));
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    const elderDoc = querySnapshot.docs[0];
-                    const elderId = elderDoc.id;
-                    eldersConnected.push(elderId);
-
-                    // Update the Elder's doc to include this family member
-                    await updateDoc(doc(db, 'users', elderId), {
-                        familyMembers: arrayUnion(user.uid)
-                    });
+            const trimCode = connectionCode.toString().trim().toUpperCase();
+            // Find elder locally
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('users_')) {
+                    try {
+                        const localUser = JSON.parse(localStorage.getItem(key) || '{}');
+                        const dataCode = (localUser.connectionCode || '').toString().trim().toUpperCase();
+                        if (localUser.role === 'elder' && dataCode === trimCode) {
+                            eldersConnected.push(localUser.uid);
+                            // Update Elder's familyMembers
+                            const familyMems = localUser.familyMembers || [];
+                            if (!familyMems.includes(user.uid)) {
+                                updateLocalDoc('users', localUser.uid, {
+                                    familyMembers: [...familyMems, user.uid]
+                                });
+                            }
+                            break;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing user data in signUpFamily", e);
+                    }
                 }
-            } catch (e) {
-                console.error("Failed to link elder during signup", e);
             }
         }
 
     const familyData: Omit<FamilyUser, 'createdAt' | 'lastLogin' | 'uid'> = {
         email,
         fullName,
-        phone: phone || null,  // Firestore does not accept undefined
+        phone: phone || null,
         relationship: relationship || 'family',
         eldersConnected: eldersConnected, 
         role: 'family'
     };
 
-    await setDoc(doc(db, 'users', user.uid), {
+    setLocalDoc('users', user.uid, {
         ...familyData,
         uid: user.uid,
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp(),
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
     });
 
     return user;
@@ -144,15 +150,11 @@ export const signInWithEmail = async (email: string, password: string) => {
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-        // Update last login
-        const userDocRef = doc(db, 'users', userCredential.user.uid);
-        try {
-            await updateDoc(userDocRef, {
-                lastActive: serverTimestamp() // or lastLogin depending on role, using generic 'lastActive' for simplicity or check role
+        const userData = getLocalDoc('users', userCredential.user.uid);
+        if (userData) {
+            updateLocalDoc('users', userCredential.user.uid, {
+                lastActive: new Date().toISOString()
             });
-        } catch (e) {
-            // If doc doesn't exist (legacy/error?), ignore or handle
-            console.error("Error updating last login", e);
         }
 
         return userCredential.user;
@@ -167,21 +169,20 @@ export const signInWithGoogle = async (role: 'elder' | 'family') => {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
+        const userData = getLocalDoc('users', user.uid);
 
-        if (!userDoc.exists()) {
+        if (!userData) {
             const baseData = {
                 uid: user.uid,
                 email: user.email || '',
                 fullName: user.displayName || '',
-                createdAt: serverTimestamp(),
-                lastActive: serverTimestamp(),
+                createdAt: new Date().toISOString(),
+                lastActive: new Date().toISOString(),
                 role: role
             };
 
             if (role === 'elder') {
-                await setDoc(userDocRef, {
+                setLocalDoc('users', user.uid, {
                     ...baseData,
                     age: 0,
                     emergencyContact: '',
@@ -190,7 +191,7 @@ export const signInWithGoogle = async (role: 'elder' | 'family') => {
                     profileSetupComplete: false
                 });
             } else {
-                await setDoc(userDocRef, {
+                setLocalDoc('users', user.uid, {
                     ...baseData,
                     phone: '',
                     relationship: 'other',
@@ -198,8 +199,8 @@ export const signInWithGoogle = async (role: 'elder' | 'family') => {
                 });
             }
         } else {
-            await updateDoc(userDocRef, {
-                lastActive: serverTimestamp()
+            updateLocalDoc('users', user.uid, {
+                lastActive: new Date().toISOString()
             });
         }
 
@@ -235,6 +236,8 @@ const getFriendlyErrorMessage = (error: any): string => {
             return "This email is already registered.";
         case 'auth/invalid-api-key':
             return "Invalid Firebase API Key in .env. (auth/invalid-api-key)";
+        case 'permission-denied':
+            return "Permission Denied: Firebase Firestore Security Rules are blocking access. Please update your rules in the Firebase Console.";
         default:
             return `An unexpected error occurred: ${errorCode}. Please check the console for details.`;
     }

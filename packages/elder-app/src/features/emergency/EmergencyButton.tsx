@@ -10,34 +10,48 @@ export const EmergencyButton = () => {
     const handleEmergency = async () => {
         setIsTriggered(true);
         try {
-            // Import dynamically to avoid top-level SSR issues (though this is SPA)
-            const { auth, db } = await import("@elder-nest/shared");
-            const { addDoc, collection, serverTimestamp, doc, getDoc } = await import("firebase/firestore");
+            // Import dynamically
+            const { auth } = await import("@elder-nest/shared");
             const user = auth.currentUser;
 
             if (user) {
                 // Get elder data to find family members to notify
-                const elderDoc = await getDoc(doc(db, 'users', user.uid));
-                const elderData = elderDoc.data();
+                const elderDataStr = localStorage.getItem(`users_${user.uid}`);
+                const elderData = elderDataStr ? JSON.parse(elderDataStr) : null;
                 const familyIds = elderData?.familyMembers || [];
 
-                await addDoc(collection(db, 'alerts'), {
-                    elderId: user.uid,
-                    type: 'sos',
-                    severity: 'critical',
-                    message: `Emergency SOS triggered by ${user.displayName || 'Elder'}!`,
-                    timestamp: serverTimestamp(),
-                    acknowledged: false,
-                    familyIds: familyIds
-                });
+                // Instead of adding an alert to a collection, we can just push it to the user's notifications array for the family to read
+                if (familyIds.length > 0) {
+                    familyIds.forEach((familyId: string) => {
+                        const famDocStr = localStorage.getItem(`users_${familyId}`);
+                        if (famDocStr) {
+                            const famData = JSON.parse(famDocStr);
+                            const notifs = famData.notifications || [];
+                            notifs.push({
+                                id: Math.random().toString(36).substring(7),
+                                elderId: user.uid,
+                                type: 'emergency',
+                                severity: 'critical',
+                                message: `Emergency SOS triggered by ${user.displayName || 'Elder'}!`,
+                                timestamp: new Date().toISOString(),
+                                acknowledged: false,
+                            });
+                            localStorage.setItem(`users_${familyId}`, JSON.stringify({
+                                ...famData,
+                                notifications: notifs
+                            }));
+                        }
+                    });
+                }
 
                 // ALSO update the user document to reflect emergency state in real-time
-                const { updateDoc } = await import("firebase/firestore");
-                const userRef = doc(db, 'users', user.uid);
-                await updateDoc(userRef, {
-                    isEmergency: true,
-                    lastActive: serverTimestamp()
-                });
+                if (elderData) {
+                    localStorage.setItem(`users_${user.uid}`, JSON.stringify({
+                        ...elderData,
+                        isEmergency: true,
+                        lastActive: new Date().toISOString()
+                    }));
+                }
             }
         } catch (e) {
             console.error("Failed to send SOS", e);

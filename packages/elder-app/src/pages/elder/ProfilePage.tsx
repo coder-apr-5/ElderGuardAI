@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Camera, Save, Plus, Trash2, Heart, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '@elder-nest/shared';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth } from '@elder-nest/shared';
 import type { ElderUser, FamilyMemberManual } from '@elder-nest/shared';
 
 export const ElderProfilePage = () => {
@@ -31,10 +30,9 @@ export const ElderProfilePage = () => {
     useEffect(() => {
         const fetchUser = async () => {
             if (auth.currentUser) {
-                const docRef = doc(db, 'users', auth.currentUser.uid);
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    const data = snap.data() as ElderUser;
+                const dataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+                if (dataStr) {
+                    const data = JSON.parse(dataStr) as ElderUser;
                     setUserData(data);
                     setFormData({
                         fullName: data.fullName || '',
@@ -81,13 +79,15 @@ export const ElderProfilePage = () => {
         if (!auth.currentUser) return;
         setSaving(true);
         try {
-            const docRef = doc(db, 'users', auth.currentUser.uid);
-            await updateDoc(docRef, {
+            const dataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+            const data = dataStr ? JSON.parse(dataStr) : {};
+            localStorage.setItem(`users_${auth.currentUser.uid}`, JSON.stringify({
+                ...data,
                 ...formData,
                 diseases: formData.diseases.split(',').map(s => s.trim()).filter(Boolean),
                 manualFamilyMembers: familyMembers,
-                updatedAt: new Date()
-            });
+                updatedAt: new Date().toISOString()
+            }));
             alert('Profile updated successfully!');
         } catch (error) {
             console.error("Error updating profile:", error);

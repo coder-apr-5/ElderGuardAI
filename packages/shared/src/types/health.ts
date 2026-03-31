@@ -1,5 +1,4 @@
-import { Timestamp } from 'firebase/firestore';
-
+// Using string for ISO dates instead of Firestore Timestamp
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type AlertType = 'fall' | 'sos' | 'health' | 'security' | 'inactive';
 
@@ -10,7 +9,7 @@ export interface Alert {
     type: AlertType;
     severity: AlertSeverity;
     message: string;
-    timestamp: Timestamp;
+    timestamp: string;
     acknowledged: boolean;
     acknowledgedBy?: string;
     metadata?: any; // For snapshot URLs or specific data
@@ -28,7 +27,7 @@ export interface Medication {
     status: { [date: string]: MedicationStatus }; // Map of YYYY-MM-DD -> Status to track daily history
     instructions?: string;
     createdBy: string; // Family UID
-    createdAt: Timestamp;
+    createdAt: string;
 }
 
 export interface VitalSign {
@@ -36,13 +35,13 @@ export interface VitalSign {
     type: 'heart_rate' | 'blood_pressure' | 'oxygen' | 'temp';
     value: number;
     unit: string;
-    timestamp: Timestamp;
+    timestamp: string;
 }
 
 export interface MoodLog {
     elderId: string;
     mood: string; // 'happy', 'sad', etc.
     confidence: number;
-    timestamp: Timestamp;
+    timestamp: string;
     note?: string;
 }

@@ -13,9 +13,8 @@ import {
   RefreshCw, User2, Users2, ChevronDown, ChevronUp, AlertTriangle,
   Activity, Shield
 } from 'lucide-react';
-import { auth, db } from '@elder-nest/shared';
+import { auth } from '@elder-nest/shared';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useMedications, isStale, daysSinceUpdate } from '@/hooks/useMedications';
 import type { MedicationInput, Medication } from '@/hooks/useMedications';
 
@@ -209,8 +208,8 @@ export const MedicationsPage = () => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) { setResolving(false); return; }
       try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const data = snap.data();
+        const dataStr = localStorage.getItem(`users_${user.uid}`);
+        const data = dataStr ? JSON.parse(dataStr) : null;
         const role = data?.role;
 
         if (role === 'family') {
@@ -219,15 +218,13 @@ export const MedicationsPage = () => {
             const firstElderId = eldersConnected[0];
             setElderId(firstElderId);
             // Fetch elder's name
-            const elderSnap = await getDoc(doc(db, 'users', firstElderId));
-            setElderName(elderSnap.data()?.fullName?.split(' ')[0] ?? 'Elder');
+            const elderDataStr = localStorage.getItem(`users_${firstElderId}`);
+            const elderData = elderDataStr ? JSON.parse(elderDataStr) : null;
+            setElderName(elderData?.fullName?.split(' ')[0] ?? 'Elder');
           } else {
-            // Try via connectionCode: family might have skipped linking
-            // Fallback: show empty state with prompt
             setElderId(null);
           }
         } else if (role === 'elder') {
-          // If somehow an elder opens this page
           setElderId(user.uid);
           setElderName(user.displayName?.split(' ')[0] ?? 'Elder');
         }

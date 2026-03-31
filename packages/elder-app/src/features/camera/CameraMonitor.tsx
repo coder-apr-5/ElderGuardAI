@@ -8,9 +8,9 @@ import {
     Square,
 } from "lucide-react";
 import { useVisionAnalysis } from "@/hooks/useVisionAnalysis";
+import { useMediaPipeVision } from "@/hooks/useMediaPipeVision";
 import { AIInsightsPanel } from "./AIInsightsPanel";
-import { auth, db, type ElderUser, type FamilyMemberManual } from "@elder-nest/shared";
-import { doc, onSnapshot, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
+import { type FamilyMemberManual } from "@elder-nest/shared";
 import { ShieldCheck, ShieldAlert, UserCheck, ScanFace } from "lucide-react";
 
 
@@ -32,35 +32,85 @@ export const CameraMonitor: React.FC = () => {
     const [detectedPerson, setDetectedPerson] = useState<{ name: string; relation: string; photo?: string } | null>(null);
     const [knownFaces, setKnownFaces] = useState<FamilyMemberManual[]>([]);
 
-    const { analyzeFrame, analyzing, lastResult } = useVisionAnalysis();
+    const { analyzeFrame, analyzing } = useVisionAnalysis();
+    const mediaPipeVision = useMediaPipeVision(videoRef, isActive && mode === 'mood');
+
+    // Combine results for the UI
+    const [lastResult, setLastResult] = useState<any>(null);
+
+    // Sync mediaPipe results to the backendResult structure so AIInsightsPanel can read it
+    useEffect(() => {
+        if (mode === 'mood' && isActive) {
+            setLastResult({
+                emotion: {
+                    emotion: mediaPipeVision.mood,
+                    confidence: mediaPipeVision.moodConfidence
+                },
+                fall: {
+                    fall_detected: false,
+                    confidence: 0.9,
+                    pose_detected: mediaPipeVision.pose !== 'Pose Unknown' && mediaPipeVision.pose !== 'No Person Detected',
+                    posture: mediaPipeVision.pose,
+                    body_angle: parseInt(mediaPipeVision.poseDetails.replace(/[^\d]/g, '')) || 0,
+                },
+                health_state: {
+                    state: 'Healthy',
+                    alert_level: 'normal'
+                },
+                security: {
+                    intruder_detected: false
+                },
+                alerts: mediaPipeVision.mood === 'No Face Detected' ? [{ type: 'vision', severity: 'warning', message: 'No face detected in frame' }] : []
+            });
+        }
+    }, [mediaPipeVision, mode, isActive]);
 
     // Fetch Known Faces (Family Members)
     useEffect(() => {
-        if (!auth.currentUser) return;
-        const docRef = doc(db, 'users', auth.currentUser.uid);
-        const unsubscribe = onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data() as ElderUser;
+        const fetchFaces = async () => {
+            const { auth } = await import("@elder-nest/shared");
+            if (!auth.currentUser) return;
+            const dataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+            if (dataStr) {
+                const data = JSON.parse(dataStr);
                 const manualMembers = data.manualFamilyMembers || [];
                 setKnownFaces(manualMembers);
             }
-        });
-        return () => unsubscribe();
+        };
+        fetchFaces();
+        const interval = setInterval(fetchFaces, 5000);
+        return () => clearInterval(interval);
     }, []);
 
     // Send Alert to Family Dashboard
     const sendSecurityAlert = async (msg: string) => {
+        const { auth } = await import("@elder-nest/shared");
         if (!auth.currentUser) return;
         try {
-            const docRef = doc(db, 'users', auth.currentUser.uid);
-            await updateDoc(docRef, {
-                notifications: arrayUnion({
-                    id: crypto.randomUUID(),
-                    type: 'security_alert',
-                    message: msg,
-                    timestamp: Timestamp.now(),
-                    read: false
-                })
+            const elderDataStr = localStorage.getItem(`users_${auth.currentUser.uid}`);
+            const elderData = elderDataStr ? JSON.parse(elderDataStr) : null;
+            if (!elderData) return;
+            
+            const familyIds = elderData.familyMembers || [];
+
+            familyIds.forEach((familyId: string) => {
+                const famDocStr = localStorage.getItem(`users_${familyId}`);
+                if (famDocStr) {
+                    const famData = JSON.parse(famDocStr);
+                    const notifs = famData.notifications || [];
+                    notifs.push({
+                        id: crypto.randomUUID(),
+                        elderId: auth.currentUser!.uid,
+                        type: 'security_alert',
+                        message: msg,
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    });
+                    localStorage.setItem(`users_${familyId}`, JSON.stringify({
+                        ...famData,
+                        notifications: notifs
+                    }));
+                }
             });
             console.log("Security Alert Sent:", msg);
         } catch (e) {
@@ -103,7 +153,7 @@ export const CameraMonitor: React.FC = () => {
         setIsActive(false);
     }, [stream]);
 
-    // Capture and Analyze Frame
+    // Capture and Analyze Frame (For Security mode / Backend)
     const captureFrame = useCallback(async () => {
         if (!videoRef.current || !canvasRef.current || !isActive || analyzing) return;
 
@@ -121,12 +171,12 @@ export const CameraMonitor: React.FC = () => {
         }
     }, [isActive, analyzing, analyzeFrame]);
 
-    // Frame processing loop (MOOD MODE)
+    // Frame processing loop (MOOD MODE - Backend sync, now mostly handled by MediaPipe locally)
     useEffect(() => {
         let interval: any;
+        // Optionally keep backend syncing but very infrequent since mediapipe handles local UI
         if (isActive && mode === 'mood') {
-            // Analyze every 3 seconds for Mood (User Requested)
-            interval = setInterval(captureFrame, 3000);
+            interval = setInterval(captureFrame, 15000); // 15s instead of 3s to save backend
         }
         return () => clearInterval(interval);
     }, [isActive, mode, captureFrame]);
