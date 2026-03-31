@@ -31,11 +31,8 @@ export function initializeAI(): void {
             parts: [{ text: "You are Mira, a warm, caring, and patient AI companion for elders. Your goal is to provide companionship, emotional support, and gentle health reminders. Always be respectful, empathetic, and encouraging. \n\nIMPORTANT: You must ALWAYS respond in a valid JSON format with the following keys:\n{\n  \"mood\": \"happy|sad|anxious|lonely|neutral|excited\",\n  \"message\": \"Your warm, empathetic response here\",\n  \"should_follow_up\": true|false,\n  \"sentiment_score\": -1.0 to 1.0\n}" }]
         },
         generationConfig: {
-            temperature: parseFloat(process.env.AI_TEMPERATURE || '0.8'),
-            maxOutputTokens: parseInt(process.env.AI_MAX_TOKENS || '500'),
-            topP: 0.9,
-            topK: 40,
-            responseMimeType: "application/json",
+            temperature: 0.7,
+            maxOutputTokens: 500,
         },
         safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -102,9 +99,8 @@ function getOrCreateSession(context: ConversationContext): ChatSession | null {
     const session = model.startChat({
         history: finalHistory,
         generationConfig: {
-            temperature: parseFloat(process.env.AI_TEMPERATURE || '0.8'),
-            maxOutputTokens: parseInt(process.env.AI_MAX_TOKENS || '500'),
-            responseMimeType: "application/json",
+            temperature: 0.7,
+            maxOutputTokens: 500,
         },
     });
 
@@ -154,16 +150,15 @@ export async function generateResponse(
             
             // Try to salvage the message from broken JSON
             const messageMatch = responseText.match(/"message"\s*:\s*"([\s\S]*?)(?:"\s*(?:}|,)|$)/);
-            if (messageMatch && messageMatch[1]) {
+            if (messageMatch && messageMatch[1] && messageMatch[1].trim() !== '') {
                 cleanMessage = messageMatch[1];
             } else {
-                // Strip markdown blocks
-                cleanMessage = cleanMessage.replace(/```json/gi, '').replace(/```/g, '');
-                
-                // Strip JSON wrapper if it got generated without "message" explicitly matched above
-                if (cleanMessage.includes('{')) {
-                    cleanMessage = cleanMessage.replace(/\{\s*"mood"\s*:\s*"[^"]*",?\s*(?:"message"\s*:\s*")?/gi, '');
-                    cleanMessage = cleanMessage.replace(/\}\s*$/g, '').trim();
+                // If it's pure raw text without JSON keys (rare due to application/json, but possible)
+                if (!responseText.includes('"mood"') && !responseText.includes('"message"')) {
+                    cleanMessage = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                } else {
+                    // It is a JSON string cut off so early that 'message' wasn't generated
+                    cleanMessage = "I'm so sorry, I had a little trouble gathering my thoughts. Please tell me again, I'm here for you.";
                 }
             }
             
@@ -224,13 +219,13 @@ export async function generateProactiveMessage(
             
             // Try to salvage the message from broken JSON
             const messageMatch = responseText.match(/"message"\s*:\s*"([\s\S]*?)(?:"\s*(?:}|,)|$)/);
-            if (messageMatch && messageMatch[1]) {
+            if (messageMatch && messageMatch[1] && messageMatch[1].trim() !== '') {
                 cleanMessage = messageMatch[1];
             } else {
-                cleanMessage = cleanMessage.replace(/```json/gi, '').replace(/```/g, '');
-                if (cleanMessage.includes('{')) {
-                    cleanMessage = cleanMessage.replace(/\{\s*"mood"\s*:\s*"[^"]*",?\s*(?:"message"\s*:\s*")?/gi, '');
-                    cleanMessage = cleanMessage.replace(/\}\s*$/g, '').trim();
+                if (!responseText.includes('"mood"') && !responseText.includes('"message"')) {
+                    cleanMessage = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                } else {
+                    cleanMessage = "Hello dear! Just checking in on you. How are you feeling right now?";
                 }
             }
             
