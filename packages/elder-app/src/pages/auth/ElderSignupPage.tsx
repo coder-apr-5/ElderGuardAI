@@ -4,14 +4,14 @@
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import PhoneInput from '../../../../family-dashboard/src/components/auth/PhoneInput';
-import OTPInput from '../../../../family-dashboard/src/components/auth/OTPInput';
+import PhoneInput from '../../components/auth/PhoneInput';
+import OTPInput from '../../components/auth/OTPInput';
 import {
   elderSignupStep1,
   elderSignupStep2,
   elderSignupStep3,
   elderSignupStep4,
-} from '../../../../family-dashboard/src/services/authApi';
+} from '../../services/authApi';
 
 type Step = 1 | 2 | 3 | 4;
 
