@@ -23,7 +23,7 @@
         "helmet": "^7.1.0",
         "jsonwebtoken": "^9.0.2",
         "libphonenumber-js": "^1.10.51",
-        "nodemailer": "^8.0.4",
+        "nodemailer": "^8.0.5",
         "twilio": "^4.20.0",
         "uuid": "^9.0.1",
         "winston": "^3.11.0"
